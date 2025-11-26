@@ -1,0 +1,105 @@
+/*
+ * Admin styles for WP Autoplugin Content Curator.
+ *
+ * @package WACC
+ */
+
+/* General Admin Page Styling */
+.wacc-admin-page .wrap {
+	margin-top: 20px;
+}
+
+/* Tabbed Interface Styling */
+.wacc-nav-tab-wrapper {
+	margin-bottom: 20px;
+	border-bottom: 1px solid #ccc;
+	padding-bottom: 0;
+	line-height: normal;
+}
+
+.wacc-nav-tab-wrapper .nav-tab {
+	padding: 8px 15px;
+	font-size: 14px;
+	line-height: 20px;
+	text-decoration: none;
+	color: #555;
+	background: #f0f0f0;
+	border: 1px solid #ccc;
+	border-bottom: none;
+	margin-right: 5px;
+	border-radius: 3px 3px 0 0;
+	display: inline-block;
+	position: relative;
+	top: 1px;
+	box-shadow: none;
+}
+
+.wacc-nav-tab-wrapper .nav-tab:hover {
+	color: #000;
+	background: #f9f9f9;
+}
+
+.wacc-nav-tab-wrapper .nav-tab-active {
+	background: #fff;
+	border-bottom: 1px solid #fff;
+	color: #000;
+}
+
+/*
+ * WordPress-generated settings sections.
+ * These are the divs that contain the settings fields for each section.
+ * They are hidden by default and shown by JS based on the active tab.
+ */
+.wrap > form > div[id^="wacc_"] { /* Target divs with IDs starting with 'wacc_' directly under the form */
+	display: none; /* Hidden by default */
+	background: #fff;
+	border: 1px solid #ccc;
+	padding: 20px;
+	border-radius: 0 3px 3px 3px;
+	margin-top: -1px; /* Overlap with the tab border */
+}
+
+/* Ensure the active section is displayed */
+.wrap > form > div[id^="wacc_"]:first-of-type {
+	display: block; /* Show the first section by default if JS fails or is disabled */
+}
+
+
+/* Settings Fields Styling */
+.form-table th {
+	width: 200px;
+	padding-right: 20px;
+}
+
+.form-table td {
+	padding-bottom: 20px;
+}
+
+.form-table textarea.large-text,
+.form-table input[type="text"].regular-text {
+	width: 100%;
+	max-width: 600px;
+}
+
+/* Validation Feedback */
+.wacc-validation-error {
+	color: #dc3232; /* WordPress error red */
+	font-size: 13px;
+	margin-top: 5px;
+	display: none; /* Hidden by default, shown by JS */
+}
+
+.wacc-validation-error.active {
+	display: block;
+}
+
+textarea.wacc-input-error,
+input.wacc-input-error {
+	border-color: #dc3232;
+	box-shadow: 0 0 0 1px #dc3232;
+}
+
+/* WordPress Admin Notices */
+.wacc-admin-page .notice {
+	margin-top: 20px;
+}
