@@ -1,0 +1,41 @@
+{
+    "apiVersion": 2,
+    "name": "nomadsguru/deals",
+    "title": "Travel Deals",
+    "category": "widgets",
+    "icon": "airplane",
+    "description": "Display travel deals in a responsive grid with filtering options.",
+    "supports": {
+        "html": false,
+        "align": [
+            "wide",
+            "full"
+        ]
+    },
+    "attributes": {
+        "perPage": {
+            "type": "number",
+            "default": 12
+        },
+        "columns": {
+            "type": "number",
+            "default": 3
+        },
+        "sortBy": {
+            "type": "string",
+            "default": "newest"
+        },
+        "enableFilter": {
+            "type": "boolean",
+            "default": true
+        },
+        "minScore": {
+            "type": "number",
+            "default": 60
+        }
+    },
+    "textdomain": "nomadsguru",
+    "editorScript": "file:./index.js",
+    "editorStyle": "file:./editor.css",
+    "style": "file:./style.css"
+}
