@@ -420,14 +420,19 @@ class NomadsGuru_Admin {
         
         $provider_link = $api_links[$current_provider] ?? $api_links['openai'];
         ?>
-        <input type="password" 
-               name="ng_ai_settings[api_key]" 
-               id="api_key" 
-               value="<?php echo esc_attr( $decrypted_key ); ?>" 
-               class="regular-text" 
-               placeholder="<?php esc_attr_e( 'Enter your API key', 'nomadsguru' ); ?>"
-               autocomplete="off"
-        />
+        <div class="api-key-input-group">
+            <input type="password" 
+                   name="ng_ai_settings[api_key]" 
+                   id="api_key" 
+                   value="<?php echo esc_attr( $decrypted_key ); ?>" 
+                   class="regular-text" 
+                   placeholder="<?php esc_attr_e( 'Enter your API key', 'nomadsguru' ); ?>"
+                   autocomplete="off"
+            />
+            <button type="button" id="manual_validate_key" class="button button-small" style="margin-left: 8px;">
+                <?php esc_html_e( 'Validate', 'nomadsguru' ); ?>
+            </button>
+        </div>
         <p class="description">
             <?php 
             printf(
@@ -581,37 +586,28 @@ class NomadsGuru_Admin {
                 break;
                 
             case 'gemini':
-                // Gemini keys: Start with "AIzaSy" and are typically 39 characters
-                error_log("Gemini: Checking length - expected ~39, got " . strlen($api_key));
+                // Gemini keys: Very lenient validation - just check prefix and basic format
+                error_log("Gemini: Checking prefix for: " . substr($api_key, 0, 10) . "...");
                 
-                // More lenient validation - check prefix and reasonable length
+                // Just check if it starts with AIzaSy and has reasonable length
                 if ( strpos( $api_key, 'AIzaSy' ) !== 0 ) {
-                    error_log("Gemini: Wrong prefix");
+                    error_log("Gemini: Wrong prefix - doesn't start with AIzaSy");
                     return [
                         'valid' => false,
                         'message' => __( 'Google Gemini API key must start with "AIzaSy"', 'nomadsguru' )
                     ];
                 }
                 
-                // Accept reasonable length range (35-45 characters to account for variations)
-                if ( strlen( $api_key ) < 35 || strlen( $api_key ) > 45 ) {
-                    error_log("Gemini: Length out of reasonable range");
+                // Very lenient length check - just needs to be longer than the prefix
+                if ( strlen( $api_key ) <= 10 ) {
+                    error_log("Gemini: Too short");
                     return [
                         'valid' => false,
-                        'message' => __( 'Google Gemini API key must be 35-45 characters long', 'nomadsguru' )
+                        'message' => __( 'Google Gemini API key is too short', 'nomadsguru' )
                     ];
                 }
                 
-                // Check for valid characters (alphanumeric and common symbols)
-                if ( ! preg_match( '/^AIzaSy[a-zA-Z0-9_.-]+$/', $api_key ) ) {
-                    error_log("Gemini: Contains invalid characters");
-                    return [
-                        'valid' => false,
-                        'message' => __( 'Google Gemini API key contains invalid characters', 'nomadsguru' )
-                    ];
-                }
-                
-                error_log("Gemini: All checks passed");
+                error_log("Gemini: Basic validation passed");
                 break;
                 
             case 'grok':

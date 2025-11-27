@@ -827,3 +827,18 @@
     color: #c62828;
     font-size: 14px;
 }
+
+/* API Key Input Group */
+.api-key-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.api-key-input-group .regular-text {
+    flex: 1;
+}
+
+.api-key-input-group .button-small {
+    flex-shrink: 0;
+}
