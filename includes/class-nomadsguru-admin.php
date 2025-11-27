@@ -550,45 +550,76 @@ class NomadsGuru_Admin {
     private function validate_api_key_format( $api_key, $provider ) {
         $api_key = trim( $api_key );
         
+        error_log("Validating API key for provider: " . $provider);
+        error_log("API Key: '" . $api_key . "'");
+        error_log("Length: " . strlen($api_key));
+        
         switch ( $provider ) {
             case 'openai':
-                // OpenAI keys: sk- (51 chars) or sk-proj- (56 chars)
-                if ( strlen( $api_key ) < 51 ) {
+                // OpenAI keys: sk- (51+ chars) or sk-proj- (56+ chars)
+                if ( strlen( $api_key ) < 20 ) { // More lenient minimum
+                    error_log("OpenAI: Too short - " . strlen($api_key) . " chars");
                     return [
                         'valid' => false,
-                        'message' => __( 'OpenAI API key must be at least 51 characters long', 'nomadsguru' )
+                        'message' => __( 'OpenAI API key must be at least 20 characters long', 'nomadsguru' )
                     ];
                 }
-                if ( ! preg_match( '/^sk-[a-zA-Z0-9_-]+$/', $api_key ) && ! preg_match( '/^sk-proj-[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                if ( strpos( $api_key, 'sk-' ) !== 0 ) {
+                    error_log("OpenAI: Wrong prefix");
                     return [
                         'valid' => false,
-                        'message' => __( 'OpenAI API key must start with "sk-" or "sk-proj-" and contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                        'message' => __( 'OpenAI API key must start with "sk-"', 'nomadsguru' )
+                    ];
+                }
+                if ( ! preg_match( '/^sk-[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                    error_log("OpenAI: Contains invalid characters");
+                    return [
+                        'valid' => false,
+                        'message' => __( 'OpenAI API key must contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
                     ];
                 }
                 break;
                 
             case 'gemini':
-                // Gemini keys: Start with "AIzaSy" + 35 characters = 39 total
-                if ( strlen( $api_key ) !== 39 ) {
+                // Gemini keys: Start with "AIzaSy" and are typically 39 characters
+                error_log("Gemini: Checking length - expected ~39, got " . strlen($api_key));
+                
+                // More lenient validation - check prefix and reasonable length
+                if ( strpos( $api_key, 'AIzaSy' ) !== 0 ) {
+                    error_log("Gemini: Wrong prefix");
                     return [
                         'valid' => false,
-                        'message' => __( 'Google Gemini API key must be exactly 39 characters long', 'nomadsguru' )
+                        'message' => __( 'Google Gemini API key must start with "AIzaSy"', 'nomadsguru' )
                     ];
                 }
-                if ( ! preg_match( '/^AIzaSy[a-zA-Z0-9_-]{35}$/', $api_key ) ) {
+                
+                // Accept reasonable length range (35-45 characters to account for variations)
+                if ( strlen( $api_key ) < 35 || strlen( $api_key ) > 45 ) {
+                    error_log("Gemini: Length out of reasonable range");
                     return [
                         'valid' => false,
-                        'message' => __( 'Google Gemini API key must start with "AIzaSy" and contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                        'message' => __( 'Google Gemini API key must be 35-45 characters long', 'nomadsguru' )
                     ];
                 }
+                
+                // Check for valid characters (alphanumeric and common symbols)
+                if ( ! preg_match( '/^AIzaSy[a-zA-Z0-9_.-]+$/', $api_key ) ) {
+                    error_log("Gemini: Contains invalid characters");
+                    return [
+                        'valid' => false,
+                        'message' => __( 'Google Gemini API key contains invalid characters', 'nomadsguru' )
+                    ];
+                }
+                
+                error_log("Gemini: All checks passed");
                 break;
                 
             case 'grok':
-                // Grok keys: Similar to OpenAI format
-                if ( strlen( $api_key ) < 20 ) {
+                // Grok keys: More lenient validation
+                if ( strlen( $api_key ) < 10 ) {
                     return [
                         'valid' => false,
-                        'message' => __( 'xAI Grok API key must be at least 20 characters long', 'nomadsguru' )
+                        'message' => __( 'xAI Grok API key must be at least 10 characters long', 'nomadsguru' )
                     ];
                 }
                 if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
@@ -600,11 +631,11 @@ class NomadsGuru_Admin {
                 break;
                 
             case 'perplexity':
-                // Perplexity keys: 32-40 characters, alphanumeric with underscores/hyphens
-                if ( strlen( $api_key ) < 32 || strlen( $api_key ) > 40 ) {
+                // Perplexity keys: More lenient validation
+                if ( strlen( $api_key ) < 10 ) {
                     return [
                         'valid' => false,
-                        'message' => __( 'Perplexity API key must be 32-40 characters long', 'nomadsguru' )
+                        'message' => __( 'Perplexity API key must be at least 10 characters long', 'nomadsguru' )
                     ];
                 }
                 if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
@@ -622,6 +653,7 @@ class NomadsGuru_Admin {
                 ];
         }
         
+        error_log("Validation: Returning valid");
         return [ 'valid' => true, 'message' => '' ];
     }
 
@@ -944,6 +976,13 @@ class NomadsGuru_Admin {
         $api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
         $provider = sanitize_text_field( $_POST['provider'] ?? 'openai' );
 
+        // Debug logging
+        error_log("API Key Validation Debug:");
+        error_log("Provider: " . $provider);
+        error_log("API Key length: " . strlen($api_key));
+        error_log("API Key: " . substr($api_key, 0, 10) . "...");
+        error_log("Raw POST data: " . print_r($_POST, true));
+
         if ( empty( $api_key ) ) {
             wp_send_json_error( array( 
                 'message' => __( 'API key is required', 'nomadsguru' ),
@@ -953,6 +992,8 @@ class NomadsGuru_Admin {
 
         // Validate API key format
         $validation = $this->validate_api_key_format( $api_key, $provider );
+        
+        error_log("Validation result: " . print_r($validation, true));
         
         if ( $validation['valid'] ) {
             wp_send_json_success( array( 
