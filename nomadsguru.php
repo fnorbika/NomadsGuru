@@ -50,26 +50,47 @@ spl_autoload_register( function ( $class ) {
         return;
     }
 
-    // Convert namespace to file path
-    $class_file = str_replace( [ 'NomadsGuru\\', '\\' ], [ '', '/' ], $class );
-    $class_file = strtolower( $class_file );
-    $class_file = str_replace( '_', '-', $class_file );
-    
-    // Build the file path
-    $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/class-' . $class_file . '.php';
-    
-    // Check for deal sources
-    if ( strpos( $class_file, 'deal-sources' ) !== false ) {
-        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/' . $class_file . '.php';
-    }
-    
-    // Check for interfaces and abstracts
-    if ( strpos( $class_file, 'interface' ) !== false ) {
-        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/' . substr( $class_file, 10 ) . '.php';
-    } elseif ( strpos( $class_file, 'abstract' ) !== false ) {
-        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/' . substr( $class_file, 10 ) . '.php';
-    } elseif ( strpos( $class_file, 'source' ) !== false ) {
-        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/sources/' . substr( $class_file, 6 ) . '.php';
+    // Check if it's a namespaced class or old-style class
+    if ( strpos( $class, '\\' ) !== false ) {
+        // Namespaced class: NomadsGuru\AI -> ai
+        $class_file = str_replace( [ 'NomadsGuru\\', '\\' ], [ '', '/' ], $class );
+        $class_file = strtolower( $class_file );
+        $class_file = str_replace( '_', '-', $class_file );
+        
+        // Build the file path
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/class-' . $class_file . '.php';
+        
+        // Check for deal sources
+        if ( strpos( $class_file, 'deal-sources' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/' . $class_file . '.php';
+        }
+        
+        // Check for interfaces and abstracts
+        if ( strpos( $class_file, 'interface' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/' . substr( $class_file, 10 ) . '.php';
+        } elseif ( strpos( $class_file, 'abstract' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/' . substr( $class_file, 10 ) . '.php';
+        } elseif ( strpos( $class_file, 'source' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/sources/' . substr( $class_file, 6 ) . '.php';
+        }
+    } else {
+        // Old-style class: NomadsGuru_AI -> nomadsguru-ai
+        $class_file = strtolower( $class );
+        $class_file = str_replace( '_', '-', $class_file );
+        
+        // Build the file path
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/class-' . $class_file . '.php';
+        
+        // Check for special cases
+        if ( strpos( $class_file, 'deal-sources' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/' . $class_file . '.php';
+        } elseif ( strpos( $class_file, 'interface' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/' . substr( $class_file, 10 ) . '.php';
+        } elseif ( strpos( $class_file, 'abstract' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/' . substr( $class_file, 10 ) . '.php';
+        } elseif ( strpos( $class_file, 'source' ) !== false ) {
+            $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/sources/' . substr( $class_file, 6 ) . '.php';
+        }
     }
     
     if ( file_exists( $file_path ) ) {
@@ -80,15 +101,17 @@ spl_autoload_register( function ( $class ) {
 /**
  * Initialize the plugin
  */
-function nomadsguru_init() {
-    // Load core class
-    if ( class_exists( 'NomadsGuru_Core' ) ) {
-        NomadsGuru_Core::get_instance();
-    }
-    
-    // Load deal sources
-    if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
-        NomadsGuru_Deal_Sources::get_instance();
+if ( ! function_exists( 'nomadsguru_init' ) ) {
+    function nomadsguru_init() {
+        // Load core class
+        if ( class_exists( 'NomadsGuru_Core' ) ) {
+            NomadsGuru_Core::get_instance();
+        }
+        
+        // Load deal sources
+        if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
+            NomadsGuru_Deal_Sources::get_instance();
+        }
     }
 }
 
@@ -98,7 +121,8 @@ add_action( 'plugins_loaded', 'nomadsguru_init' );
 /**
  * Handle legacy AJAX requests for backward compatibility
  */
-function nomadsguru_handle_test_ai_connection() {
+if ( ! function_exists( 'nomadsguru_handle_test_ai_connection' ) ) {
+    function nomadsguru_handle_test_ai_connection() {
     // Verify nonce
     if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
         wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
@@ -122,13 +146,15 @@ function nomadsguru_handle_test_ai_connection() {
     } else {
         wp_send_json_error( array( 'message' => __( 'AI service not available.', 'nomadsguru' ) ) );
     }
+    }
 }
 add_action( 'wp_ajax_ng_test_ai_connection', 'nomadsguru_handle_test_ai_connection' );
 
 /**
  * Handle legacy AJAX requests for data reset
  */
-function nomadsguru_handle_reset_plugin_data() {
+if ( ! function_exists( 'nomadsguru_handle_reset_plugin_data' ) ) {
+    function nomadsguru_handle_reset_plugin_data() {
     // Verify nonce
     if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
         wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
@@ -165,43 +191,52 @@ function nomadsguru_handle_reset_plugin_data() {
     }
 
     wp_send_json_success( array( 'message' => __( 'Plugin data has been reset successfully.', 'nomadsguru' ) ) );
+    }
 }
 add_action( 'wp_ajax_nomadsguru_reset_plugin_data', 'nomadsguru_handle_reset_plugin_data' );
 
 /**
  * Get AI settings (legacy function for backward compatibility)
  */
-function nomadsguru_get_ai_settings() {
-    return get_option( 'ng_ai_settings', [] );
+if ( ! function_exists( 'nomadsguru_get_ai_settings' ) ) {
+    function nomadsguru_get_ai_settings() {
+        return get_option( 'ng_ai_settings', [] );
+    }
 }
 
 /**
  * Get publishing settings (legacy function for backward compatibility)
  */
-function nomadsguru_get_publishing_settings() {
-    return get_option( 'ng_publishing_settings', [] );
-}
-
-/**
- * Schedule deal sync (legacy function)
- */
-function nomadsguru_schedule_sync() {
-    if ( ! wp_next_scheduled( 'nomadsguru_sync_deals' ) ) {
-        wp_schedule_event( time(), 'hourly', 'nomadsguru_sync_deals' );
+if ( ! function_exists( 'nomadsguru_get_publishing_settings' ) ) {
+    function nomadsguru_get_publishing_settings() {
+        return get_option( 'ng_publishing_settings', [] );
     }
 }
 
 /**
- * Unschedule deal sync (legacy function)
+ * Schedule sync
  */
-function nomadsguru_unschedule_sync() {
-    wp_clear_scheduled_hook( 'nomadsguru_sync_deals' );
+if ( ! function_exists( 'nomadsguru_schedule_sync' ) ) {
+    function nomadsguru_schedule_sync() {
+        if ( ! wp_next_scheduled( 'nomadsguru_sync_deals' ) ) {
+            wp_schedule_event( time(), 'hourly', 'nomadsguru_sync_deals' );
+        }
+    }
+}
+
+/**
+ * Unschedule sync
+ */
+if ( ! function_exists( 'nomadsguru_unschedule_sync' ) ) {
+    function nomadsguru_unschedule_sync() {
+        wp_clear_scheduled_hook( 'nomadsguru_sync_deals' );
+    }
 }
 
 /**
  * Plugin activation hook
  */
-register_activation_hook( __FILE__, function() {
+function nomadsguru_activate() {
     // Create database tables
     if ( class_exists( 'NomadsGuru_Core' ) ) {
         $core = NomadsGuru_Core::get_instance();
@@ -213,26 +248,33 @@ register_activation_hook( __FILE__, function() {
     
     // Flush rewrite rules
     flush_rewrite_rules();
-} );
+}
+register_activation_hook( __FILE__, 'nomadsguru_activate' );
 
 /**
  * Plugin deactivation hook
  */
-register_deactivation_hook( __FILE__, function() {
+function nomadsguru_deactivate() {
     // Unschedule sync
     nomadsguru_unschedule_sync();
     
     // Flush rewrite rules
     flush_rewrite_rules();
-} );
+}
+register_deactivation_hook( __FILE__, 'nomadsguru_deactivate' );
 
 /**
- * Plugin uninstall hook (for future use)
+ * Plugin uninstall hook
  */
-register_uninstall_hook( __FILE__, function() {
+function nomadsguru_uninstall() {
     // Clean up all data if user wants complete removal
     // This will be implemented when we add an uninstall option
-} );
+    
+    // For now, just remove plugin options
+    delete_option('nomadsguru_settings');
+    delete_option('nomadsguru_version');
+}
+register_uninstall_hook( __FILE__, 'nomadsguru_uninstall' );
 
 /**
  * Get plugin info
@@ -284,7 +326,7 @@ function nomadsguru_log( $message, $level = 'info' ) {
 }
 
 // Add admin notice if not configured
-add_action( 'admin_notices', function() {
+function nomadsguru_admin_notices() {
     if ( is_admin() && current_user_can( 'manage_options' ) && ! nomadsguru_is_configured() ) {
         ?>
         <div class="notice notice-warning is-dismissible">
@@ -301,4 +343,5 @@ add_action( 'admin_notices', function() {
         </div>
         <?php
     }
-} );
+}
+add_action( 'admin_notices', 'nomadsguru_admin_notices' );
