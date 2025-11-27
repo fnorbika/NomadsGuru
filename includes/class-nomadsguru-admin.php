@@ -61,6 +61,8 @@ class NomadsGuru_Admin {
         add_action( 'wp_ajax_ng_save_affiliate', array( $this, 'handle_save_affiliate' ) );
         add_action( 'wp_ajax_ng_delete_affiliate', array( $this, 'handle_delete_affiliate' ) );
         add_action( 'wp_ajax_ng_test_ai_connection', array( $this, 'handle_test_ai_connection' ) );
+        add_action( 'wp_ajax_ng_fetch_deals', array( $this, 'handle_fetch_deals' ) );
+        add_action( 'wp_ajax_ng_create_sample_csv', array( $this, 'handle_create_sample_csv' ) );
         add_action( 'wp_ajax_nomadsguru_reset_plugin_data', array( $this, 'handle_reset_data' ) );
         
         // Settings registration
@@ -183,7 +185,8 @@ class NomadsGuru_Admin {
                     'api_key' => '',
                     'model' => 'gpt-3.5-turbo',
                     'temperature' => 0.7,
-                    'max_tokens' => 500
+                    'max_tokens' => 500,
+                    'image_api_keys' => array()
                 )
             )
         );
@@ -254,6 +257,14 @@ class NomadsGuru_Admin {
         );
 
         add_settings_field(
+            'image_api_keys',
+            __( 'Image API Keys', 'nomadsguru' ),
+            array( $this, 'render_image_api_keys_field' ),
+            'nomadsguru_ai_settings',
+            'ng_ai_section'
+        );
+
+        add_settings_field(
             'test_connection',
             __( 'Test Connection', 'nomadsguru' ),
             array( $this, 'render_test_connection_field' ),
@@ -290,6 +301,9 @@ class NomadsGuru_Admin {
                 <a href="?page=nomadsguru-settings&tab=ai" class="nav-tab <?php echo $active_tab === 'ai' ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e( 'AI Settings', 'nomadsguru' ); ?>
                 </a>
+                <a href="?page=nomadsguru-settings&tab=sources" class="nav-tab <?php echo $active_tab === 'sources' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?>
+                </a>
                 <a href="?page=nomadsguru-settings&tab=publishing" class="nav-tab <?php echo $active_tab === 'publishing' ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e( 'Publishing', 'nomadsguru' ); ?>
                 </a>
@@ -301,6 +315,9 @@ class NomadsGuru_Admin {
             <div class="tab-content">
                 <?php
                 switch ( $active_tab ) {
+                    case 'sources':
+                        $this->render_sources_tab();
+                        break;
                     case 'publishing':
                         $this->render_publishing_tab();
                         break;
@@ -347,6 +364,350 @@ class NomadsGuru_Admin {
             submit_button( __( 'Save Publishing Settings', 'nomadsguru' ) );
             ?>
         </form>
+        <?php
+    }
+
+    /**
+     * Render Deal Sources tab
+     */
+    private function render_sources_tab() {
+        // Get deal sources manager
+        $sources_manager = NomadsGuru_Deal_Sources::get_instance();
+        $sources = $sources_manager->get_sources();
+        $statistics = $sources_manager->get_source_statistics();
+        
+        ?>
+        <div class="ng-sources-management">
+            <div class="ng-sources-header">
+                <h2><?php esc_html_e( 'Deal Sources Management', 'nomadsguru' ); ?></h2>
+                <p><?php esc_html_e( 'Configure and manage your deal sources. The system supports CSV files, RSS feeds, web scrapers, and API integrations.', 'nomadsguru' ); ?></p>
+            </div>
+            
+            <!-- Manual Fetch Section -->
+            <div class="ng-manual-fetch">
+                <h3><?php esc_html_e( 'Manual Deal Fetch', 'nomadsguru' ); ?></h3>
+                <p><?php esc_html_e( 'Manually trigger deal fetching from all active sources.', 'nomadsguru' ); ?></p>
+                
+                <button type="button" id="ng_fetch_deals" class="button button-primary">
+                    <?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>
+                </button>
+                
+                <div id="ng_fetch_results" class="ng-fetch-results"></div>
+            </div>
+            
+            <!-- Active Sources -->
+            <div class="ng-active-sources">
+                <h3><?php esc_html_e( 'Active Sources', 'nomadsguru' ); ?></h3>
+                
+                <?php if ( empty( $sources ) ): ?>
+                    <div class="ng-no-sources">
+                        <p><?php esc_html_e( 'No active deal sources configured. Add sources below to get started.', 'nomadsguru' ); ?></p>
+                    </div>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e( 'Source Name', 'nomadsguru' ); ?></th>
+                                <th><?php esc_html_e( 'Type', 'nomadsguru' ); ?></th>
+                                <th><?php esc_html_e( 'Status', 'nomadsguru' ); ?></th>
+                                <th><?php esc_html_e( 'Last Fetch', 'nomadsguru' ); ?></th>
+                                <th><?php esc_html_e( 'Total Deals', 'nomadsguru' ); ?></th>
+                                <th><?php esc_html_e( 'Actions', 'nomadsguru' ); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $sources as $name => $source ): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo esc_html( $source->get_name() ); ?></strong>
+                                        <br>
+                                        <small><?php echo esc_html( $source->get_type() ); ?> source</small>
+                                    </td>
+                                    <td>
+                                        <span class="ng-source-type ng-type-<?php echo esc_attr( $source->get_type() ); ?>">
+                                            <?php echo esc_html( ucfirst( $source->get_type() ) ); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ( $source->is_active() ): ?>
+                                            <span class="ng-status ng-status-active"><?php esc_html_e( 'Active', 'nomadsguru' ); ?></span>
+                                        <?php else: ?>
+                                            <span class="ng-status ng-status-inactive"><?php esc_html_e( 'Inactive', 'nomadsguru' ); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $last_fetch = $source->get_last_fetch();
+                                        if ( $last_fetch > 0 ) {
+                                            echo esc_html( human_time_diff( $last_fetch ) ) . ' ' . esc_html__( 'ago', 'nomadsguru' );
+                                        } else {
+                                            esc_html_e( 'Never', 'nomadsguru' );
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $source_stats = array_filter( $statistics, function( $stat ) use ( $name ) {
+                                            return $stat['source'] === $name;
+                                        });
+                                        if ( ! empty( $source_stats ) ) {
+                                            $stat = reset( $source_stats );
+                                            echo esc_html( $stat['total_deals'] );
+                                        } else {
+                                            echo '0';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="button button-small ng-test-source" data-source="<?php echo esc_attr( $name ); ?>">
+                                            <?php esc_html_e( 'Test', 'nomadsguru' ); ?>
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Source Statistics -->
+            <?php if ( ! empty( $statistics ) ): ?>
+                <div class="ng-source-statistics">
+                    <h3><?php esc_html_e( 'Source Statistics', 'nomadsguru' ); ?></h3>
+                    
+                    <div class="ng-stats-grid">
+                        <?php foreach ( $statistics as $stat ): ?>
+                            <div class="ng-stat-card">
+                                <h4><?php echo esc_html( $stat['source'] ); ?></h4>
+                                <div class="ng-stat-details">
+                                    <div class="ng-stat-item">
+                                        <span class="ng-stat-label"><?php esc_html_e( 'Total Deals:', 'nomadsguru' ); ?></span>
+                                        <span class="ng-stat-value"><?php echo esc_html( $stat['total_deals'] ); ?></span>
+                                    </div>
+                                    <div class="ng-stat-item">
+                                        <span class="ng-stat-label"><?php esc_html_e( 'Pending:', 'nomadsguru' ); ?></span>
+                                        <span class="ng-stat-value"><?php echo esc_html( $stat['pending_deals'] ); ?></span>
+                                    </div>
+                                    <div class="ng-stat-item">
+                                        <span class="ng-stat-label"><?php esc_html_e( 'Approved:', 'nomadsguru' ); ?></span>
+                                        <span class="ng-stat-value"><?php echo esc_html( $stat['approved_deals'] ); ?></span>
+                                    </div>
+                                    <div class="ng-stat-item">
+                                        <span class="ng-stat-label"><?php esc_html_e( 'Last Fetch:', 'nomadsguru' ); ?></span>
+                                        <span class="ng-stat-value">
+                                            <?php 
+                                            if ( $stat['last_fetch'] ) {
+                                                echo esc_html( human_time_diff( strtotime( $stat['last_fetch'] ) ) ) . ' ' . esc_html__( 'ago', 'nomadsguru' );
+                                            } else {
+                                                esc_html_e( 'Never', 'nomadsguru' );
+                                            }
+                                            ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
+            <!-- CSV Source Management -->
+            <div class="ng-csv-source">
+                <h3><?php esc_html_e( 'CSV Manual Source', 'nomadsguru' ); ?></h3>
+                <p><?php esc_html_e( 'Manage your manual CSV deal source. The CSV file should contain columns: title, destination, original_price, discounted_price, currency, travel_start, travel_end, booking_url, description', 'nomadsguru' ); ?></p>
+                
+                <div class="ng-csv-actions">
+                    <button type="button" id="ng_create_sample_csv" class="button button-secondary">
+                        <?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>
+                    </button>
+                    
+                    <div class="ng-csv-info">
+                        <p><strong><?php esc_html_e( 'Current CSV File:', 'nomadsguru' ); ?></strong></p>
+                        <p><?php echo esc_html( NOMADSGURU_PLUGIN_DIR . 'data/manual-deals.csv' ); ?></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add Custom Source -->
+            <div class="ng-add-source">
+                <h3><?php esc_html_e( 'Add Custom Source', 'nomadsguru' ); ?></h3>
+                <p><?php esc_html_e( 'Add custom RSS feeds, API endpoints, or web scrapers.', 'nomadsguru' ); ?></p>
+                
+                <div class="ng-source-types">
+                    <button type="button" class="button ng-add-rss" data-type="rss">
+                        <?php esc_html_e( 'Add RSS Feed', 'nomadsguru' ); ?>
+                    </button>
+                    <button type="button" class="button ng-add-api" data-type="api">
+                        <?php esc_html_e( 'Add API Source', 'nomadsguru' ); ?>
+                    </button>
+                    <button type="button" class="button ng-add-scraper" data-type="scraper">
+                        <?php esc_html_e( 'Add Web Scraper', 'nomadsguru' ); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Manual fetch
+            $('#ng_fetch_deals').on('click', function() {
+                var $button = $(this);
+                var $results = $('#ng_fetch_results');
+                
+                $button.prop('disabled', true).text('<?php esc_html_e( 'Fetching...', 'nomadsguru' ); ?>');
+                $results.html('<div class="ng-loading"><?php esc_html_e( 'Fetching deals from all sources...', 'nomadsguru' ); ?></div>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    data: {
+                        action: 'ng_fetch_deals',
+                        nonce: '<?php echo wp_create_nonce( 'nomadsguru_admin_nonce' ); ?>'
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text('<?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>');
+                        
+                        if (response.success) {
+                            var html = '<div class="ng-success">';
+                            html += '<h4><?php esc_html_e( 'Fetch Complete!', 'nomadsguru' ); ?></h4>';
+                            html += '<p><?php esc_html_e( 'Sources processed:', 'nomadsguru' ); ?> ' + response.data.sources_processed + '</p>';
+                            html += '<p><?php esc_html_e( 'Total deals fetched:', 'nomadsguru' ); ?> ' + response.data.total_deals + '</p>';
+                            html += '<p><?php esc_html_e( 'New deals saved:', 'nomadsguru' ); ?> ' + response.data.new_deals + '</p>';
+                            html += '</div>';
+                            $results.html(html);
+                            
+                            // Reload page after delay to show updated stats
+                            setTimeout(function() {
+                                location.reload();
+                            }, 2000);
+                        } else {
+                            $results.html('<div class="ng-error">' + response.data.message + '</div>');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>');
+                        $results.html('<div class="ng-error"><?php esc_html_e( 'Request failed. Please try again.', 'nomadsguru' ); ?></div>');
+                    }
+                });
+            });
+            
+            // Create sample CSV
+            $('#ng_create_sample_csv').on('click', function() {
+                var $button = $(this);
+                
+                $button.prop('disabled', true).text('<?php esc_html_e( 'Creating...', 'nomadsguru' ); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    data: {
+                        action: 'ng_create_sample_csv',
+                        nonce: '<?php echo wp_create_nonce( 'nomadsguru_admin_nonce' ); ?>'
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text('<?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>');
+                        
+                        if (response.success) {
+                            alert('<?php esc_html_e( 'Sample CSV file created successfully!', 'nomadsguru' ); ?>');
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( 'Failed to create sample CSV.', 'nomadsguru' ); ?>');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>');
+                        alert('<?php esc_html_e( 'Request failed. Please try again.', 'nomadsguru' ); ?>');
+                    }
+                });
+            });
+        });
+        </script>
+        
+        <style>
+        .ng-sources-management {
+            max-width: 1200px;
+        }
+        .ng-sources-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .ng-manual-fetch, .ng-active-sources, .ng-source-statistics, .ng-csv-source, .ng-add-source {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .ng-fetch-results {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .ng-fetch-results .ng-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .ng-fetch-results .ng-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .ng-fetch-results .ng-loading {
+            background: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        .ng-source-type {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .ng-type-csv { background: #e3f2fd; color: #1976d2; }
+        .ng-type-rss { background: #f3e5f5; color: #7b1fa2; }
+        .ng-type-api { background: #e8f5e8; color: #388e3c; }
+        .ng-type-scraper { background: #fff3e0; color: #f57c00; }
+        .ng-status {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .ng-status-active { background: #d4edda; color: #155724; }
+        .ng-status-inactive { background: #f8d7da; color: #721c24; }
+        .ng-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .ng-stat-card {
+            padding: 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .ng-stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .ng-stat-label {
+            font-weight: 500;
+        }
+        .ng-stat-value {
+            font-weight: bold;
+        }
+        .ng-csv-actions {
+            margin-top: 20px;
+        }
+        .ng-source-types {
+            margin-top: 20px;
+        }
+        .ng-source-types button {
+            margin-right: 10px;
+        }
+        </style>
         <?php
     }
 
@@ -540,6 +901,114 @@ class NomadsGuru_Admin {
     }
 
     /**
+     * Render Image API Keys field
+     */
+    public function render_image_api_keys_field() {
+        $settings = get_option( 'ng_ai_settings', [] );
+        $image_keys = $settings['image_api_keys'] ?? [];
+        ?>
+        <div class="ng-image-api-keys">
+            <p class="description">
+                <?php esc_html_e( 'Configure API keys for image providers. Pixabay works without a key (demo key included).', 'nomadsguru' ); ?>
+            </p>
+            
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row">
+                        <label for="pixabay_key">
+                            <?php esc_html_e( 'Pixabay API Key', 'nomadsguru' ); ?>
+                            <span class="description">(<?php esc_html_e( 'Optional - free tier available', 'nomadsguru' ); ?>)</span>
+                        </label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ng_ai_settings[image_api_keys][pixabay]" 
+                               id="pixabay_key" 
+                               value="<?php echo esc_attr( $image_keys['pixabay'] ?? '' ); ?>" 
+                               class="regular-text" 
+                               placeholder="<?php esc_attr_e( 'Get your free API key from pixabay.com', 'nomadsguru' ); ?>"
+                        />
+                        <p class="description">
+                            <?php 
+                            printf(
+                                /* translators: %s: URL to Pixabay API */
+                                esc_html__( 'Get your free API key from %s. 5,000 requests/hour.', 'nomadsguru' ),
+                                '<a href="https://pixabay.com/api/docs/" target="_blank">Pixabay</a>'
+                            );
+                            ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="pexels_key">
+                            <?php esc_html_e( 'Pexels API Key', 'nomadsguru' ); ?>
+                            <span class="description">(<?php esc_html_e( 'Optional', 'nomadsguru' ); ?>)</span>
+                        </label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ng_ai_settings[image_api_keys][pexels]" 
+                               id="pexels_key" 
+                               value="<?php echo esc_attr( $image_keys['pexels'] ?? '' ); ?>" 
+                               class="regular-text" 
+                               placeholder="<?php esc_attr_e( 'Get your free API key from pexels.com', 'nomadsguru' ); ?>"
+                        />
+                        <p class="description">
+                            <?php 
+                            printf(
+                                /* translators: %s: URL to Pexels API */
+                                esc_html__( 'Get your free API key from %s. 200 requests/hour.', 'nomadsguru' ),
+                                '<a href="https://www.pexels.com/api/" target="_blank">Pexels</a>'
+                            );
+                            ?>
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="unsplash_key">
+                            <?php esc_html_e( 'Unsplash API Key', 'nomadsguru' ); ?>
+                            <span class="description">(<?php esc_html_e( 'Optional', 'nomadsguru' ); ?>)</span>
+                        </label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ng_ai_settings[image_api_keys][unsplash]" 
+                               id="unsplash_key" 
+                               value="<?php echo esc_attr( $image_keys['unsplash'] ?? '' ); ?>" 
+                               class="regular-text" 
+                               placeholder="<?php esc_attr_e( 'Get your free API key from unsplash.com', 'nomadsguru' ); ?>"
+                        />
+                        <p class="description">
+                            <?php 
+                            printf(
+                                /* translators: %s: URL to Unsplash API */
+                                esc_html__( 'Get your free API key from %s. 50 requests/hour (demo), unlimited on approval.', 'nomadsguru' ),
+                                '<a href="https://unsplash.com/developers" target="_blank">Unsplash</a>'
+                            );
+                            ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            
+            <div class="ng-image-provider-info">
+                <h4><?php esc_html_e( 'Provider Priority', 'nomadsguru' ); ?></h4>
+                <p><?php esc_html_e( 'Images are searched in this order: Pixabay → Pexels → Unsplash → Placeholder', 'nomadsguru' ); ?></p>
+                <ul>
+                    <li><strong>Pixabay:</strong> <?php esc_html_e( 'Free, 5,000 req/hour, no key required for demo', 'nomadsguru' ); ?></li>
+                    <li><strong>Pexels:</strong> <?php esc_html_e( 'Free, 200 req/hour, requires API key', 'nomadsguru' ); ?></li>
+                    <li><strong>Unsplash:</strong> <?php esc_html_e( 'Free, 50 req/hour demo, requires API key', 'nomadsguru' ); ?></li>
+                </ul>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
      * Sanitize AI settings
      */
     public function sanitize_ai_settings( $input ) {
@@ -578,6 +1047,17 @@ class NomadsGuru_Admin {
         // Sanitize max tokens
         $tokens = intval( $input['max_tokens'] ?? 500 );
         $sanitized['max_tokens'] = max( 100, min( 4000, $tokens ) );
+
+        // Sanitize image API keys
+        $image_keys = [];
+        if ( !empty( $input['image_api_keys'] ) && is_array( $input['image_api_keys'] ) ) {
+            foreach ( $input['image_api_keys'] as $provider => $key ) {
+                if ( !empty( $key ) ) {
+                    $image_keys[$provider] = sanitize_text_field( $key );
+                }
+            }
+        }
+        $sanitized['image_api_keys'] = $image_keys;
 
         // Add success message
         add_settings_error(
@@ -889,6 +1369,58 @@ class NomadsGuru_Admin {
         }
 
         wp_send_json_success( array( 'message' => __( 'Plugin data has been reset successfully.', 'nomadsguru' ) ) );
+    }
+
+    /**
+     * Handle fetch deals AJAX request
+     */
+    public function handle_fetch_deals() {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+
+        // Check user capabilities
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+
+        // Get deal sources manager
+        $sources_manager = NomadsGuru_Deal_Sources::get_instance();
+        
+        // Fetch deals from all sources
+        $results = $sources_manager->fetch_all_deals();
+        
+        wp_send_json_success( array(
+            'sources_processed' => $results['sources_processed'],
+            'sources_failed' => $results['sources_failed'],
+            'total_deals' => $results['total_deals'],
+            'new_deals' => $results['total_deals'], // All fetched deals are new for now
+            'details' => $results['details']
+        ) );
+    }
+
+    /**
+     * Handle create sample CSV AJAX request
+     */
+    public function handle_create_sample_csv() {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+
+        // Check user capabilities
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+
+        // Get deal sources manager
+        $sources_manager = NomadsGuru_Deal_Sources::get_instance();
+        
+        // Initialize CSV source with sample data
+        $sources_manager->initialize_csv_source();
+        
+        wp_send_json_success( array( 'message' => __( 'Sample CSV file created successfully.', 'nomadsguru' ) ) );
     }
 
     /**

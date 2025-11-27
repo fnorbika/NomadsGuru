@@ -3,7 +3,7 @@
  * Plugin Name: NomadsGuru - Travel Deals AI
  * Plugin URI:  https://nomadsguru.com
  * Description: Automatically discovers, evaluates, and publishes travel deals using AI. Lightweight and robust solution for travel content automation.
- * Version:     1.1.8
+ * Version:     1.4.0
  * Author:      NomadsGuru Team
  * Author URI:  https://nomadsguru.com
  * License:     GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define Plugin Constants
-define( 'NOMADSGURU_VERSION', '1.1.8' );
+define( 'NOMADSGURU_VERSION', '1.4.0' );
 define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_FILE', __FILE__ );
@@ -58,6 +58,20 @@ spl_autoload_register( function ( $class ) {
     // Build the file path
     $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/class-' . $class_file . '.php';
     
+    // Check for deal sources
+    if ( strpos( $class_file, 'deal-sources' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/' . $class_file . '.php';
+    }
+    
+    // Check for interfaces and abstracts
+    if ( strpos( $class_file, 'interface' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/' . substr( $class_file, 10 ) . '.php';
+    } elseif ( strpos( $class_file, 'abstract' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/' . substr( $class_file, 10 ) . '.php';
+    } elseif ( strpos( $class_file, 'source' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/sources/' . substr( $class_file, 6 ) . '.php';
+    }
+    
     if ( file_exists( $file_path ) ) {
         require_once $file_path;
     }
@@ -70,6 +84,11 @@ function nomadsguru_init() {
     // Load core class
     if ( class_exists( 'NomadsGuru_Core' ) ) {
         NomadsGuru_Core::get_instance();
+    }
+    
+    // Load deal sources
+    if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
+        NomadsGuru_Deal_Sources::get_instance();
     }
 }
 
