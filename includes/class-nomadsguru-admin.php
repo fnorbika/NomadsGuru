@@ -1106,7 +1106,7 @@ class NomadsGuru_Admin {
      */
     public function handle_save_source() {
         // Verify nonce
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'ng_save_source' ) ) {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
             wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
         }
 
@@ -1117,6 +1117,26 @@ class NomadsGuru_Admin {
 
         global $wpdb;
         $table = $wpdb->prefix . 'ng_deal_sources';
+        
+        // Create table if it doesn't exist
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS $table (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            source_type varchar(50) DEFAULT '',
+            source_name varchar(255) DEFAULT '',
+            website_url text,
+            rss_feed text,
+            sync_interval_minutes int(11) DEFAULT 60,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_source_type (source_type),
+            KEY idx_is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
         
         $source_id = isset( $_POST['id'] ) ? intval( $_POST['id'] ) : 0;
         $source_type = sanitize_text_field( $_POST['source_type'] );
@@ -1171,7 +1191,7 @@ class NomadsGuru_Admin {
      */
     public function handle_get_source() {
         // Verify nonce
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'ng_save_source' ) ) {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
             wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
         }
 
@@ -1184,6 +1204,27 @@ class NomadsGuru_Admin {
         
         global $wpdb;
         $table = $wpdb->prefix . 'ng_deal_sources';
+        
+        // Create table if it doesn't exist
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS $table (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            source_type varchar(50) DEFAULT '',
+            source_name varchar(255) DEFAULT '',
+            website_url text,
+            rss_feed text,
+            sync_interval_minutes int(11) DEFAULT 60,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_source_type (source_type),
+            KEY idx_is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
+        
         $source = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $source_id ) );
 
         if ( $source ) {
@@ -1198,7 +1239,7 @@ class NomadsGuru_Admin {
      */
     public function handle_delete_source() {
         // Verify nonce
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'ng_save_source' ) ) {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
             wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
         }
 
@@ -1211,6 +1252,27 @@ class NomadsGuru_Admin {
         
         global $wpdb;
         $table = $wpdb->prefix . 'ng_deal_sources';
+        
+        // Create table if it doesn't exist
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS $table (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            source_type varchar(50) DEFAULT '',
+            source_name varchar(255) DEFAULT '',
+            website_url text,
+            rss_feed text,
+            sync_interval_minutes int(11) DEFAULT 60,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_source_type (source_type),
+            KEY idx_is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
+        
         $result = $wpdb->delete( $table, array( 'id' => $source_id ), array( '%d' ) );
 
         if ( $result !== false ) {
@@ -1225,7 +1287,7 @@ class NomadsGuru_Admin {
      */
     public function handle_save_affiliate() {
         // Verify nonce
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'ng_save_affiliate' ) ) {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
             wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
         }
 
@@ -1236,6 +1298,25 @@ class NomadsGuru_Admin {
 
         global $wpdb;
         $table = $wpdb->prefix . 'ng_affiliate_programs';
+        
+        // Create table if it doesn't exist
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS $table (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            program_name varchar(255) DEFAULT '',
+            program_type varchar(50) DEFAULT '',
+            url_pattern text,
+            commission_rate decimal(5,2) DEFAULT 0.00,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_program_type (program_type),
+            KEY idx_is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
         
         $affiliate_id = isset( $_POST['id'] ) ? intval( $_POST['id'] ) : 0;
         $program_name = sanitize_text_field( $_POST['program_name'] );
@@ -1280,7 +1361,7 @@ class NomadsGuru_Admin {
      */
     public function handle_delete_affiliate() {
         // Verify nonce
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'ng_save_affiliate' ) ) {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
             wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
         }
 
@@ -1293,6 +1374,26 @@ class NomadsGuru_Admin {
         
         global $wpdb;
         $table = $wpdb->prefix . 'ng_affiliate_programs';
+        
+        // Create table if it doesn't exist
+        $charset_collate = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE IF NOT EXISTS $table (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            program_name varchar(255) DEFAULT '',
+            program_type varchar(50) DEFAULT '',
+            url_pattern text,
+            commission_rate decimal(5,2) DEFAULT 0.00,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_program_type (program_type),
+            KEY idx_is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        dbDelta( $sql );
+        
         $result = $wpdb->delete( $table, array( 'id' => $affiliate_id ), array( '%d' ) );
 
         if ( $result !== false ) {
