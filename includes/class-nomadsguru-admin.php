@@ -98,54 +98,14 @@ class NomadsGuru_Admin {
             array( $this, 'render_dashboard' )
         );
 
-        // Settings submenu
+        // Deals submenu
         add_submenu_page(
             'nomadsguru',
-            __( 'Settings', 'nomadsguru' ),
-            __( 'Settings', 'nomadsguru' ),
+            __( 'Deals', 'nomadsguru' ),
+            __( 'Deals', 'nomadsguru' ),
             'manage_options',
-            'nomadsguru-settings',
-            array( $this, 'render_settings' )
-        );
-
-        // Sources Overview (main sources page)
-        add_submenu_page(
-            'nomadsguru',
-            __( 'Sources', 'nomadsguru' ),
-            __( 'Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-overview',
-            array( $this, 'render_sources_overview' )
-        );
-
-        // Deal Sources submenu
-        add_submenu_page(
-            'nomadsguru',
-            __( 'Deal Sources', 'nomadsguru' ),
-            __( 'Deal Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-deal',
-            array( $this, 'render_sources_deal' )
-        );
-
-        // Image Sources submenu
-        add_submenu_page(
-            'nomadsguru',
-            __( 'Image Sources', 'nomadsguru' ),
-            __( 'Image Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-image',
-            array( $this, 'render_sources_image' )
-        );
-
-        // Inspiration Sources submenu
-        add_submenu_page(
-            'nomadsguru',
-            __( 'Inspiration Sources', 'nomadsguru' ),
-            __( 'Inspiration Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-inspiration',
-            array( $this, 'render_sources_inspiration' )
+            'nomadsguru-deals',
+            array( $this, 'render_deals' )
         );
 
         // Queue submenu
@@ -158,14 +118,64 @@ class NomadsGuru_Admin {
             array( $this, 'render_queue' )
         );
 
-        // Logs submenu
+        // Analytics submenu
         add_submenu_page(
             'nomadsguru',
-            __( 'Logs', 'nomadsguru' ),
-            __( 'Logs', 'nomadsguru' ),
+            __( 'Analytics', 'nomadsguru' ),
+            __( 'Analytics', 'nomadsguru' ),
             'manage_options',
-            'nomadsguru-logs',
-            array( $this, 'render_logs' )
+            'nomadsguru-analytics',
+            array( $this, 'render_analytics' )
+        );
+
+        // Settings submenu (main settings page)
+        add_submenu_page(
+            'nomadsguru',
+            __( 'Settings', 'nomadsguru' ),
+            __( 'Settings', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-settings',
+            array( $this, 'render_settings' )
+        );
+
+        // Sources submenu under Settings
+        add_submenu_page(
+            'nomadsguru-settings',
+            __( 'Sources', 'nomadsguru' ),
+            __( 'Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-overview',
+            array( $this, 'render_sources_overview' )
+        );
+
+        // Deal Sources submenu under Settings
+        add_submenu_page(
+            'nomadsguru-settings',
+            __( 'Deal Sources', 'nomadsguru' ),
+            __( 'Deal Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-deal',
+            array( $this, 'render_sources_deal' )
+        );
+
+        // Image Sources submenu under Settings
+        add_submenu_page(
+            'nomadsguru-settings',
+            __( 'Image Sources', 'nomadsguru' ),
+            __( 'Image Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-image',
+            array( $this, 'render_sources_image' )
+        );
+
+        // Inspiration Sources submenu under Settings
+        add_submenu_page(
+            'nomadsguru-settings',
+            __( 'Inspiration Sources', 'nomadsguru' ),
+            __( 'Inspiration Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-inspiration',
+            array( $this, 'render_sources_inspiration' )
         );
     }
 
@@ -3118,5 +3128,174 @@ class NomadsGuru_Admin {
         } else {
             wp_send_json_error( array( 'message' => $message ) );
         }
+    }
+
+    /**
+     * Render Deals page
+     */
+    public function render_deals() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Deals Management', 'nomadsguru' ); ?></h1>
+            
+            <div class="nomadsguru-deals-modern">
+                <!-- Deals Statistics -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-number"><?php echo $this->get_deal_count(); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Total Deals', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-number"><?php echo $this->get_published_deal_count(); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Published', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-number"><?php echo $this->get_pending_deal_count(); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Pending', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🗑️</div>
+                        <div class="stat-number"><?php echo $this->get_rejected_deal_count(); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Rejected', 'nomadsguru' ); ?></div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3><?php esc_html_e( 'Quick Actions', 'nomadsguru' ); ?></h3>
+                    <div class="actions-grid">
+                        <button type="button" class="button button-primary" id="fetch-new-deals">
+                            <span class="dashicons dashicons-update-alt"></span>
+                            <?php esc_html_e( 'Fetch New Deals', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button" id="process-queue">
+                            <span class="dashicons dashicons-clock"></span>
+                            <?php esc_html_e( 'Process Queue', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button" id="export-deals">
+                            <span class="dashicons dashicons-download"></span>
+                            <?php esc_html_e( 'Export Deals', 'nomadsguru' ); ?>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Deals -->
+                <div class="recent-deals">
+                    <h3><?php esc_html_e( 'Recent Deals', 'nomadsguru' ); ?></h3>
+                    <div class="deals-table">
+                        <?php
+                        global $wpdb;
+                        $recent_deals = $wpdb->get_results( "
+                            SELECT r.*, s.source_name 
+                            FROM {$wpdb->prefix}ng_raw_deals r
+                            LEFT JOIN {$wpdb->prefix}ng_deal_sources s ON r.source_id = s.id
+                            ORDER BY r.created_at DESC
+                            LIMIT 10
+                        " );
+                        
+                        if ( ! empty( $recent_deals ) ) {
+                            echo '<table class="wp-list-table widefat fixed striped">';
+                            echo '<thead><tr>';
+                            echo '<th>' . esc_html__( 'Title', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Destination', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Price', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Source', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Status', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Actions', 'nomadsguru' ) . '</th>';
+                            echo '</tr></thead><tbody>';
+                            
+                            foreach ( $recent_deals as $deal ) {
+                                echo '<tr>';
+                                echo '<td><strong>' . esc_html( $deal->title ) . '</strong></td>';
+                                echo '<td>' . esc_html( $deal->destination ) . '</td>';
+                                echo '<td>' . esc_html( $deal->currency ) . ' ' . esc_html( $deal->discounted_price ) . '</td>';
+                                echo '<td>' . esc_html( $deal->source_name ?? 'Unknown' ) . '</td>';
+                                echo '<td><span class="status-badge status-' . esc_attr( $deal->status ) . '">' . esc_html( ucfirst( $deal->status ) ) . '</span></td>';
+                                echo '<td>';
+                                if ( $deal->status === 'pending' ) {
+                                    echo '<button type="button" class="button button-small approve-deal" data-id="' . esc_attr( $deal->id ) . '">' . esc_html__( 'Approve', 'nomadsguru' ) . '</button> ';
+                                    echo '<button type="button" class="button button-small reject-deal" data-id="' . esc_attr( $deal->id ) . '">' . esc_html__( 'Reject', 'nomadsguru' ) . '</button>';
+                                }
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                            
+                            echo '</tbody></table>';
+                        } else {
+                            echo '<p>' . esc_html__( 'No deals found.', 'nomadsguru' ) . '</p>';
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Fetch new deals
+            $('#fetch-new-deals').on('click', function() {
+                const $button = $(this);
+                $button.prop('disabled', true).text('<?php esc_html_e( "Fetching...", "nomadsguru" ); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ng_fetch_deals',
+                        nonce: '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>'
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Fetch New Deals", "nomadsguru" ); ?>');
+                        if (response.success) {
+                            alert(response.data.message || '<?php esc_html_e( "Deals fetched successfully!", "nomadsguru" ); ?>');
+                            location.reload();
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( "Failed to fetch deals.", "nomadsguru" ); ?>');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Fetch New Deals", "nomadsguru" ); ?>');
+                        alert('<?php esc_html_e( "Request failed. Please try again.", "nomadsguru" ); ?>');
+                    }
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * Get deal count
+     */
+    private function get_deal_count() {
+        global $wpdb;
+        return $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals" ) ?: 0;
+    }
+
+    /**
+     * Get published deal count
+     */
+    private function get_published_deal_count() {
+        global $wpdb;
+        return $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'published'" ) ?: 0;
+    }
+
+    /**
+     * Get pending deal count
+     */
+    private function get_pending_deal_count() {
+        global $wpdb;
+        return $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'pending'" ) ?: 0;
+    }
+
+    /**
+     * Get rejected deal count
+     */
+    private function get_rejected_deal_count() {
+        global $wpdb;
+        return $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'rejected'" ) ?: 0;
     }
 }
