@@ -722,3 +722,108 @@
     color: #666;
     line-height: 1.6;
 }
+
+/* Settings Notices */
+.notice-success {
+    border-left-color: var(--ng-success) !important;
+    background-color: #f0f9f0;
+    border: 1px solid var(--ng-success);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.notice-success.is-dismissible {
+    padding-right: 38px;
+}
+
+/* Enhanced success message styling */
+.notice-success .ng-success-icon {
+    color: var(--ng-success);
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.notice-success .ng-success-title {
+    font-weight: 600;
+    color: var(--ng-text);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.notice-success .ng-success-message {
+    color: #2e7d32;
+    font-size: 14px;
+}
+
+/* API Key Validation Styles */
+.ng-validation-result {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: all 0.2s ease;
+}
+
+.ng-validation-result.ng-valid {
+    background-color: #f0f9f0;
+    border: 1px solid var(--ng-success);
+    color: #2e7d32;
+}
+
+.ng-validation-result.ng-invalid {
+    background-color: #fef2f2;
+    border: 1px solid var(--ng-warning);
+    color: #c62828;
+}
+
+.ng-validation-result.ng-validating {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    color: #666;
+}
+
+.ng-validation-icon {
+    font-weight: bold;
+    margin-right: 6px;
+    font-size: 14px;
+}
+
+.ng-validation-result.ng-valid .ng-validation-icon {
+    color: var(--ng-success);
+}
+
+.ng-validation-result.ng-invalid .ng-validation-icon {
+    color: var(--ng-warning);
+}
+
+.ng-validation-result.ng-validating .spinner {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* Enhanced error styling */
+.notice-error {
+    border-left-color: var(--ng-warning) !important;
+    background-color: #fef2f2;
+    border: 1px solid var(--ng-warning);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.notice-error .ng-error-icon {
+    color: var(--ng-warning);
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.notice-error .ng-error-title {
+    font-weight: 600;
+    color: var(--ng-text);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.notice-error .ng-error-message {
+    color: #c62828;
+    font-size: 14px;
+}

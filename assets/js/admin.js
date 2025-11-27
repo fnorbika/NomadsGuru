@@ -116,6 +116,96 @@ jQuery(document).ready(function ($) {
     
     console.log('Event handlers attached'); // Debug
     
+    // Real-time API Key Validation
+    function validateApiKeyRealtime() {
+        var $apiKeyField = $('#api_key');
+        var $providerField = $('#ai_provider');
+        var $validationResult = $('#api_key_validation');
+        
+        if ($apiKeyField.length === 0 || $providerField.length === 0) {
+            return; // Fields not found
+        }
+        
+        // Create validation result div if it doesn't exist
+        if ($validationResult.length === 0) {
+            $apiKeyField.after('<div id="api_key_validation" class="ng-validation-result"></div>');
+            $validationResult = $('#api_key_validation');
+        }
+        
+        function validateKey() {
+            var apiKey = $apiKeyField.val().trim();
+            var provider = $providerField.val();
+            
+            // Don't validate masked values or empty values
+            if (apiKey.indexOf('••••') === 0 || apiKey === '') {
+                $validationResult.removeClass('ng-valid ng-invalid').empty();
+                return;
+            }
+            
+            // Show loading state
+            $validationResult.removeClass('ng-valid ng-invalid')
+                              .addClass('ng-validating')
+                              .html('<span class="spinner is-active"></span> Validating...');
+            
+            // Make AJAX request for validation
+            $.ajax({
+                url: nomadsguruParams.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'ng_validate_api_key',
+                    api_key: apiKey,
+                    provider: provider,
+                    nonce: nomadsguruParams.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $validationResult.removeClass('ng-validating ng-invalid')
+                                          .addClass('ng-valid')
+                                          .html('<span class="ng-validation-icon">✓</span> ' + response.data.message);
+                    } else {
+                        $validationResult.removeClass('ng-validating ng-valid')
+                                          .addClass('ng-invalid')
+                                          .html('<span class="ng-validation-icon">✗</span> ' + response.data.message);
+                    }
+                },
+                error: function() {
+                    $validationResult.removeClass('ng-validating ng-valid')
+                                      .addClass('ng-invalid')
+                                      .html('<span class="ng-validation-icon">✗</span> Validation failed');
+                }
+            });
+        }
+        
+        // Validate on input (with debounce)
+        var debounceTimer;
+        $apiKeyField.on('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(validateKey, 500);
+        });
+        
+        // Validate on provider change
+        $providerField.on('change', function() {
+            validateKey();
+        });
+        
+        // Initial validation if field has value
+        if ($apiKeyField.val().trim() !== '') {
+            validateKey();
+        }
+    }
+    
+    // Initialize real-time validation
+    validateApiKeyRealtime();
+    
+    // Re-initialize when tabs are switched
+    $(document).on('click', '.nav-tab', function(e) {
+        if ($(this).attr('href') && $(this).attr('href').indexOf('tab=ai') !== -1) {
+            setTimeout(function() {
+                validateApiKeyRealtime();
+            }, 100);
+        }
+    });
+    
     // AI Provider Change Handler
     function updateModelsForProvider(providerSelect) {
         var provider = providerSelect.val();
@@ -558,6 +648,25 @@ jQuery(document).ready(function ($) {
         if ($aiProvider.length > 0) {
             console.log('AI Settings form submitted'); // Debug
             console.log('Form data before submit:', $(this).serialize()); // Debug
+            
+            // Check API key validation
+            var $apiKeyField = $('#api_key');
+            var $validationResult = $('#api_key_validation');
+            var apiKey = $apiKeyField.val().trim();
+            
+            // Don't validate if it's a masked value or empty
+            if (apiKey.indexOf('••••') !== 0 && apiKey !== '') {
+                if ($validationResult.hasClass('ng-invalid')) {
+                    alert('Please fix the API key validation errors before saving.');
+                    e.preventDefault();
+                    return false;
+                }
+                if ($validationResult.hasClass('ng-validating')) {
+                    alert('Please wait for API key validation to complete before saving.');
+                    e.preventDefault();
+                    return false;
+                }
+            }
             
             // Show loading state
             var $submitButton = $(this).find('input[type="submit"]');

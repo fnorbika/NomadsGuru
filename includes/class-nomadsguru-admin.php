@@ -61,6 +61,7 @@ class NomadsGuru_Admin {
         add_action( 'wp_ajax_ng_save_affiliate', array( $this, 'handle_save_affiliate' ) );
         add_action( 'wp_ajax_ng_delete_affiliate', array( $this, 'handle_delete_affiliate' ) );
         add_action( 'wp_ajax_ng_test_ai_connection', array( $this, 'handle_test_ai_connection' ) );
+        add_action( 'wp_ajax_ng_validate_api_key', array( $this, 'handle_validate_api_key' ) );
         add_action( 'wp_ajax_nomadsguru_reset_plugin_data', array( $this, 'handle_reset_data' ) );
         
         // Settings registration
@@ -540,7 +541,92 @@ class NomadsGuru_Admin {
     }
 
     /**
-     * Sanitize AI settings
+     * Validate API key format based on provider
+     * 
+     * @param string $api_key
+     * @param string $provider
+     * @return array Validation result with message
+     */
+    private function validate_api_key_format( $api_key, $provider ) {
+        $api_key = trim( $api_key );
+        
+        switch ( $provider ) {
+            case 'openai':
+                // OpenAI keys: sk- (51 chars) or sk-proj- (56 chars)
+                if ( strlen( $api_key ) < 51 ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'OpenAI API key must be at least 51 characters long', 'nomadsguru' )
+                    ];
+                }
+                if ( ! preg_match( '/^sk-[a-zA-Z0-9_-]+$/', $api_key ) && ! preg_match( '/^sk-proj-[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'OpenAI API key must start with "sk-" or "sk-proj-" and contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                    ];
+                }
+                break;
+                
+            case 'gemini':
+                // Gemini keys: 32-39 characters, alphanumeric with underscores/hyphens
+                if ( strlen( $api_key ) < 32 || strlen( $api_key ) > 39 ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'Google Gemini API key must be 32-39 characters long', 'nomadsguru' )
+                    ];
+                }
+                if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'Google Gemini API key must contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                    ];
+                }
+                break;
+                
+            case 'grok':
+                // Grok keys: Similar to OpenAI format
+                if ( strlen( $api_key ) < 20 ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'xAI Grok API key must be at least 20 characters long', 'nomadsguru' )
+                    ];
+                }
+                if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'xAI Grok API key must contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                    ];
+                }
+                break;
+                
+            case 'perplexity':
+                // Perplexity keys: 32-40 characters, alphanumeric with underscores/hyphens
+                if ( strlen( $api_key ) < 32 || strlen( $api_key ) > 40 ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'Perplexity API key must be 32-40 characters long', 'nomadsguru' )
+                    ];
+                }
+                if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                    return [
+                        'valid' => false,
+                        'message' => __( 'Perplexity API key must contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                    ];
+                }
+                break;
+                
+            default:
+                return [
+                    'valid' => false,
+                    'message' => __( 'Unknown AI provider', 'nomadsguru' )
+                ];
+        }
+        
+        return [ 'valid' => true, 'message' => '' ];
+    }
+
+    /**
+     * Sanitize AI settings with validation
      */
     public function sanitize_ai_settings( $input ) {
         $sanitized = [];
@@ -559,8 +645,27 @@ class NomadsGuru_Admin {
                 $existing_settings = get_option( 'ng_ai_settings', [] );
                 $sanitized['api_key'] = $existing_settings['api_key'] ?? '';
             } else {
-                // Save new API key
-                $sanitized['api_key'] = base64_encode( $input['api_key'] );
+                // Validate new API key format
+                $validation = $this->validate_api_key_format( $input['api_key'], $sanitized['provider'] );
+                if ( ! $validation['valid'] ) {
+                    // Add validation error
+                    add_settings_error(
+                        'nomadsguru_messages',
+                        'api_key_invalid',
+                        sprintf(
+                            '<span class="ng-error-icon">⚠</span><span class="ng-error-title">%s</span><span class="ng-error-message">%s</span>',
+                            __( 'Invalid API Key', 'nomadsguru' ),
+                            $validation['message']
+                        ),
+                        'error'
+                    );
+                    // Don't save invalid key
+                    $existing_settings = get_option( 'ng_ai_settings', [] );
+                    $sanitized['api_key'] = $existing_settings['api_key'] ?? '';
+                } else {
+                    // Save valid API key
+                    $sanitized['api_key'] = base64_encode( $input['api_key'] );
+                }
             }
         } else {
             // Keep existing API key if field is empty (user didn't change it)
@@ -579,6 +684,18 @@ class NomadsGuru_Admin {
         $tokens = intval( $input['max_tokens'] ?? 500 );
         $sanitized['max_tokens'] = max( 100, min( 4000, $tokens ) );
 
+        // Add success message
+        add_settings_error(
+            'nomadsguru_messages',
+            'ai_settings_saved',
+            sprintf(
+                '<span class="ng-success-icon">✓</span><span class="ng-success-title">%s</span><span class="ng-success-message">%s</span>',
+                __( 'AI Settings Saved Successfully!', 'nomadsguru' ),
+                __( 'Your AI configuration has been updated and is ready to use.', 'nomadsguru' )
+            ),
+            'success'
+        );
+
         return $sanitized;
     }
 
@@ -593,6 +710,18 @@ class NomadsGuru_Admin {
         $sanitized['default_author'] = intval( $input['default_author'] ?? 1 );
         $sanitized['publish_threshold'] = floatval( $input['publish_threshold'] ?? 7.0 );
         $sanitized['publish_threshold'] = max( 1, min( 10, $sanitized['publish_threshold'] ) );
+
+        // Add success message
+        add_settings_error(
+            'nomadsguru_messages',
+            'publishing_settings_saved',
+            sprintf(
+                '<span class="ng-success-icon">✓</span><span class="ng-success-title">%s</span><span class="ng-success-message">%s</span>',
+                __( 'Publishing Settings Saved!', 'nomadsguru' ),
+                __( 'Your publishing configuration has been updated.', 'nomadsguru' )
+            ),
+            'success'
+        );
 
         return $sanitized;
     }
@@ -795,6 +924,46 @@ class NomadsGuru_Admin {
             wp_send_json_success( array( 'message' => __( 'Affiliate program deleted successfully.', 'nomadsguru' ) ) );
         } else {
             wp_send_json_error( array( 'message' => __( 'Failed to delete affiliate program.', 'nomadsguru' ) ) );
+        }
+    }
+
+    /**
+     * Handle AJAX request to validate API key
+     */
+    public function handle_validate_api_key() {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+
+        // Check user capabilities
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+
+        $api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
+        $provider = sanitize_text_field( $_POST['provider'] ?? 'openai' );
+
+        if ( empty( $api_key ) ) {
+            wp_send_json_error( array( 
+                'message' => __( 'API key is required', 'nomadsguru' ),
+                'field' => 'api_key'
+            ) );
+        }
+
+        // Validate API key format
+        $validation = $this->validate_api_key_format( $api_key, $provider );
+        
+        if ( $validation['valid'] ) {
+            wp_send_json_success( array( 
+                'message' => __( 'API key format is valid', 'nomadsguru' ),
+                'field' => 'api_key'
+            ) );
+        } else {
+            wp_send_json_error( array( 
+                'message' => $validation['message'],
+                'field' => 'api_key'
+            ) );
         }
     }
 
