@@ -977,7 +977,6 @@ class NomadsGuru_Admin {
         error_log("Provider: " . $provider);
         error_log("API Key length: " . strlen($api_key));
         error_log("API Key: " . substr($api_key, 0, 10) . "...");
-        error_log("Raw POST data: " . print_r($_POST, true));
 
         if ( empty( $api_key ) ) {
             wp_send_json_error( array( 
@@ -986,21 +985,261 @@ class NomadsGuru_Admin {
             ) );
         }
 
-        // Validate API key format
-        $validation = $this->validate_api_key_format( $api_key, $provider );
+        // Modern validation: Test the API key with actual API call
+        $test_result = $this->test_api_key_live( $api_key, $provider );
         
-        error_log("Validation result: " . print_r($validation, true));
-        
-        if ( $validation['valid'] ) {
+        if ( $test_result['success'] ) {
             wp_send_json_success( array( 
-                'message' => __( 'API key format is valid', 'nomadsguru' ),
+                'message' => __( 'API key is valid and working!', 'nomadsguru' ),
                 'field' => 'api_key'
             ) );
         } else {
             wp_send_json_error( array( 
-                'message' => $validation['message'],
+                'message' => $test_result['message'],
                 'field' => 'api_key'
             ) );
+        }
+    }
+
+    /**
+     * Test API key with live API call
+     */
+    private function test_api_key_live( $api_key, $provider ) {
+        switch ( $provider ) {
+            case 'gemini':
+                return $this->test_gemini_api_key( $api_key );
+            case 'openai':
+                return $this->test_openai_api_key( $api_key );
+            case 'grok':
+                return $this->test_grok_api_key( $api_key );
+            case 'perplexity':
+                return $this->test_perplexity_api_key( $api_key );
+            default:
+                return [
+                    'success' => false,
+                    'message' => __( 'Unknown AI provider', 'nomadsguru' )
+                ];
+        }
+    }
+
+    /**
+     * Test Gemini API key with real API call
+     */
+    private function test_gemini_api_key( $api_key ) {
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+        
+        $body = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => 'Hello']
+                    ]
+                ]
+            ]
+        ];
+        
+        $response = wp_remote_post( $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $api_key
+            ],
+            'body' => json_encode( $body ),
+            'timeout' => 15,
+            'method' => 'POST'
+        ]);
+        
+        if ( is_wp_error( $response ) ) {
+            error_log('Gemini API test error: ' . $response->get_error_message());
+            return [
+                'success' => false,
+                'message' => __( 'API connection failed: ', 'nomadsguru' ) . $response->get_error_message()
+            ];
+        }
+        
+        $http_code = wp_remote_retrieve_response_code( $response );
+        $body = wp_remote_retrieve_body( $response );
+        
+        error_log('Gemini API response code: ' . $http_code);
+        error_log('Gemini API response body: ' . substr($body, 0, 200));
+        
+        if ( $http_code === 200 ) {
+            return [
+                'success' => true,
+                'message' => __( 'API key is valid and working', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 401 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Invalid API key - please check your key and try again', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 403 ) {
+            return [
+                'success' => false,
+                'message' => __( 'API key lacks permissions or billing issue', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 429 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Rate limit exceeded - please wait and try again', 'nomadsguru' )
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => __( 'API test failed with status ', 'nomadsguru' ) . $http_code . ': ' . substr($body, 0, 100)
+            ];
+        }
+    }
+
+    /**
+     * Test OpenAI API key with real API call
+     */
+    private function test_openai_api_key( $api_key ) {
+        $url = 'https://api.openai.com/v1/chat/completions';
+        
+        $body = [
+            'model' => 'gpt-3.5-turbo',
+            'messages' => [
+                ['role' => 'user', 'content' => 'Hello']
+            ],
+            'max_tokens' => 5
+        ];
+        
+        $response = wp_remote_post( $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key
+            ],
+            'body' => json_encode( $body ),
+            'timeout' => 15,
+            'method' => 'POST'
+        ]);
+        
+        if ( is_wp_error( $response ) ) {
+            return [
+                'success' => false,
+                'message' => __( 'API connection failed: ', 'nomadsguru' ) . $response->get_error_message()
+            ];
+        }
+        
+        $http_code = wp_remote_retrieve_response_code( $response );
+        
+        if ( $http_code === 200 ) {
+            return [
+                'success' => true,
+                'message' => __( 'API key is valid and working', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 401 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Invalid API key - please check your key and try again', 'nomadsguru' )
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => __( 'API test failed with status ', 'nomadsguru' ) . $http_code
+            ];
+        }
+    }
+
+    /**
+     * Test Grok API key with real API call
+     */
+    private function test_grok_api_key( $api_key ) {
+        $url = 'https://api.x.ai/v1/chat/completions';
+        
+        $body = [
+            'model' => 'grok-beta',
+            'messages' => [
+                ['role' => 'user', 'content' => 'Hello']
+            ],
+            'max_tokens' => 5
+        ];
+        
+        $response = wp_remote_post( $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key
+            ],
+            'body' => json_encode( $body ),
+            'timeout' => 15,
+            'method' => 'POST'
+        ]);
+        
+        if ( is_wp_error( $response ) ) {
+            return [
+                'success' => false,
+                'message' => __( 'API connection failed: ', 'nomadsguru' ) . $response->get_error_message()
+            ];
+        }
+        
+        $http_code = wp_remote_retrieve_response_code( $response );
+        
+        if ( $http_code === 200 ) {
+            return [
+                'success' => true,
+                'message' => __( 'API key is valid and working', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 401 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Invalid API key - please check your key and try again', 'nomadsguru' )
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => __( 'API test failed with status ', 'nomadsguru' ) . $http_code
+            ];
+        }
+    }
+
+    /**
+     * Test Perplexity API key with real API call
+     */
+    private function test_perplexity_api_key( $api_key ) {
+        $url = 'https://api.perplexity.ai/chat/completions';
+        
+        $body = [
+            'model' => 'llama-3.1-sonar-small-128k-online',
+            'messages' => [
+                ['role' => 'user', 'content' => 'Hello']
+            ],
+            'max_tokens' => 5
+        ];
+        
+        $response = wp_remote_post( $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key
+            ],
+            'body' => json_encode( $body ),
+            'timeout' => 15,
+            'method' => 'POST'
+        ]);
+        
+        if ( is_wp_error( $response ) ) {
+            return [
+                'success' => false,
+                'message' => __( 'API connection failed: ', 'nomadsguru' ) . $response->get_error_message()
+            ];
+        }
+        
+        $http_code = wp_remote_retrieve_response_code( $response );
+        
+        if ( $http_code === 200 ) {
+            return [
+                'success' => true,
+                'message' => __( 'API key is valid and working', 'nomadsguru' )
+            ];
+        } elseif ( $http_code === 401 ) {
+            return [
+                'success' => false,
+                'message' => __( 'Invalid API key - please check your key and try again', 'nomadsguru' )
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => __( 'API test failed with status ', 'nomadsguru' ) . $http_code
+            ];
         }
     }
 

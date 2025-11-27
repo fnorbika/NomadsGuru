@@ -151,7 +151,7 @@ jQuery(document).ready(function ($) {
             // Show loading state
             $validationResult.removeClass('ng-valid ng-invalid')
                               .addClass('ng-validating')
-                              .html('<span class="spinner is-active"></span> Validating...');
+                              .html('<span class="spinner is-active"></span> Testing API key with live call...');
             
             // Make AJAX request for validation
             $.ajax({
