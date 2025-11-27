@@ -366,19 +366,22 @@ class NomadsGuru_Deal_Sources {
     public function get_source_statistics() {
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'ng_raw_deals';
+        $table_deals = $wpdb->prefix . 'ng_raw_deals';
+        $table_sources = $wpdb->prefix . 'ng_deal_sources';
         
         $stats = $wpdb->get_results("
             SELECT 
-                source,
-                source_type,
-                COUNT(*) as total_deals,
-                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_deals,
-                COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved_deals,
-                COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected_deals,
-                MAX(created_at) as last_fetch
-            FROM $table_name
-            GROUP BY source, source_type
+                s.source_name,
+                s.source_type,
+                COUNT(d.id) as total_deals,
+                COUNT(CASE WHEN d.status = 'pending' THEN 1 END) as pending_deals,
+                COUNT(CASE WHEN d.status = 'approved' THEN 1 END) as approved_deals,
+                COUNT(CASE WHEN d.status = 'rejected' THEN 1 END) as rejected_deals,
+                COUNT(CASE WHEN d.status = 'published' THEN 1 END) as published_deals,
+                MAX(d.created_at) as last_fetch
+            FROM $table_sources s
+            LEFT JOIN $table_deals d ON s.id = d.source_id
+            GROUP BY s.id, s.source_name, s.source_type
             ORDER BY total_deals DESC
         ", ARRAY_A );
         
