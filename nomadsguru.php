@@ -69,7 +69,7 @@ register_deactivation_hook( __FILE__, array( 'NomadsGuru\\Core\\Loader', 'deacti
  */
 function nomadsguru_handle_save_source() {
     // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_save_source')) {
+    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
         wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
     }
 
@@ -80,6 +80,27 @@ function nomadsguru_handle_save_source() {
 
     global $wpdb;
     $table = $wpdb->prefix . 'ng_deal_sources';
+    
+    // Create table if it doesn't exist
+    $charset_collate = $wpdb->get_charset_collate();
+    $sql = "CREATE TABLE IF NOT EXISTS $table (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        source_type varchar(50) DEFAULT '',
+        source_name varchar(255) DEFAULT '',
+        website_url text,
+        rss_feed text,
+        api_endpoint text,
+        sync_interval_minutes int(11) DEFAULT 60,
+        is_active tinyint(1) DEFAULT 1,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_source_type (source_type),
+        KEY idx_is_active (is_active)
+    ) $charset_collate;";
+    
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
     
     $source_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     $source_type = sanitize_text_field($_POST['source_type']);
@@ -137,7 +158,7 @@ add_action('wp_ajax_ng_save_source', 'nomadsguru_handle_save_source');
  */
 function nomadsguru_handle_get_source() {
     // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_save_source')) {
+    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
         wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
     }
 
@@ -148,6 +169,28 @@ function nomadsguru_handle_get_source() {
 
     global $wpdb;
     $table = $wpdb->prefix . 'ng_deal_sources';
+    
+    // Create table if it doesn't exist
+    $charset_collate = $wpdb->get_charset_collate();
+    $sql = "CREATE TABLE IF NOT EXISTS $table (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        source_type varchar(50) DEFAULT '',
+        source_name varchar(255) DEFAULT '',
+        website_url text,
+        rss_feed text,
+        api_endpoint text,
+        sync_interval_minutes int(11) DEFAULT 60,
+        is_active tinyint(1) DEFAULT 1,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_source_type (source_type),
+        KEY idx_is_active (is_active)
+    ) $charset_collate;";
+    
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+    
     $source_id = intval($_POST['source_id']);
 
     $source = $wpdb->get_row($wpdb->prepare(
@@ -168,7 +211,7 @@ add_action('wp_ajax_ng_get_source', 'nomadsguru_handle_get_source');
  */
 function nomadsguru_handle_delete_source() {
     // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_save_source')) {
+    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
         wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
     }
 
@@ -179,6 +222,28 @@ function nomadsguru_handle_delete_source() {
 
     global $wpdb;
     $table = $wpdb->prefix . 'ng_deal_sources';
+    
+    // Create table if it doesn't exist
+    $charset_collate = $wpdb->get_charset_collate();
+    $sql = "CREATE TABLE IF NOT EXISTS $table (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        source_type varchar(50) DEFAULT '',
+        source_name varchar(255) DEFAULT '',
+        website_url text,
+        rss_feed text,
+        api_endpoint text,
+        sync_interval_minutes int(11) DEFAULT 60,
+        is_active tinyint(1) DEFAULT 1,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_source_type (source_type),
+        KEY idx_is_active (is_active)
+    ) $charset_collate;";
+    
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+    
     $source_id = intval($_POST['source_id']);
 
     $result = $wpdb->delete($table, array('id' => $source_id));
