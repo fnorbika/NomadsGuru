@@ -568,17 +568,17 @@ class NomadsGuru_Admin {
                 break;
                 
             case 'gemini':
-                // Gemini keys: 32-39 characters, alphanumeric with underscores/hyphens
-                if ( strlen( $api_key ) < 32 || strlen( $api_key ) > 39 ) {
+                // Gemini keys: Start with "AIzaSy" + 35 characters = 39 total
+                if ( strlen( $api_key ) !== 39 ) {
                     return [
                         'valid' => false,
-                        'message' => __( 'Google Gemini API key must be 32-39 characters long', 'nomadsguru' )
+                        'message' => __( 'Google Gemini API key must be exactly 39 characters long', 'nomadsguru' )
                     ];
                 }
-                if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $api_key ) ) {
+                if ( ! preg_match( '/^AIzaSy[a-zA-Z0-9_-]{35}$/', $api_key ) ) {
                     return [
                         'valid' => false,
-                        'message' => __( 'Google Gemini API key must contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
+                        'message' => __( 'Google Gemini API key must start with "AIzaSy" and contain only letters, numbers, underscores, and hyphens', 'nomadsguru' )
                     ];
                 }
                 break;
