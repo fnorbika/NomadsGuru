@@ -553,7 +553,19 @@ class NomadsGuru_Admin {
 
         // Sanitize API key
         if ( !empty( $input['api_key'] ) ) {
-            $sanitized['api_key'] = base64_encode( $input['api_key'] );
+            // Check if this is the masked value (starts with ••••)
+            if ( strpos( $input['api_key'], '••••' ) === 0 ) {
+                // Keep existing API key if masked value is submitted
+                $existing_settings = get_option( 'ng_ai_settings', [] );
+                $sanitized['api_key'] = $existing_settings['api_key'] ?? '';
+            } else {
+                // Save new API key
+                $sanitized['api_key'] = base64_encode( $input['api_key'] );
+            }
+        } else {
+            // Keep existing API key if field is empty (user didn't change it)
+            $existing_settings = get_option( 'ng_ai_settings', [] );
+            $sanitized['api_key'] = $existing_settings['api_key'] ?? '';
         }
 
         // Sanitize model

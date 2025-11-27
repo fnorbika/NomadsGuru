@@ -182,10 +182,8 @@ jQuery(document).ready(function ($) {
         console.log('API link:', apiLink); // Debug
         $apiKeyDescription.html(apiLink);
         
-        // Clear API key field when switching providers (only if it was the masked value)
-        if ($apiKeyField.val().indexOf('••••') === 0) {
-            $apiKeyField.val('');
-        }
+        // Don't clear API key field when switching providers
+        // The masked value will be preserved by the PHP sanitization
         
         // Trigger change event to ensure consistency
         $modelSelect.trigger('change');
