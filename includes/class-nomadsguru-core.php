@@ -125,13 +125,9 @@ class NomadsGuru_Core {
      * Register Gutenberg blocks
      */
     public function register_blocks() {
-        // Register blocks here
-        // For now, we'll keep the existing block structure but could consolidate later
-        if ( file_exists( NOMADSGURU_PLUGIN_DIR . 'src/Blocks/DealsBlock.php' ) ) {
-            require_once NOMADSGURU_PLUGIN_DIR . 'src/Blocks/DealsBlock.php';
-            $deals_block = new \NomadsGuru\Blocks\DealsBlock();
-            $deals_block->register();
-        }
+        // Gutenberg blocks functionality removed - legacy code deleted
+        // Blocks can be re-implemented in the future if needed
+        // For now, focusing on the core deal sources and AI functionality
     }
 
     /**

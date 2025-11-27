@@ -1,444 +1,304 @@
 <?php
 /**
- * Plugin Name: NomadsGuru
+ * Plugin Name: NomadsGuru - Travel Deals AI
  * Plugin URI:  https://nomadsguru.com
- * Description: Automatically discovers, evaluates, and publishes travel deals using AI.
- * Version:     1.0.1
+ * Description: Automatically discovers, evaluates, and publishes travel deals using AI. Lightweight and robust solution for travel content automation.
+ * Version:     1.4.0
  * Author:      NomadsGuru Team
  * Author URI:  https://nomadsguru.com
  * License:     GPL-2.0+
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: nomadsguru
  * Domain Path: /languages
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+    exit; // Exit if accessed directly
 }
 
 // Define Plugin Constants
-define( 'NOMADSGURU_VERSION', '1.0.3' );
+define( 'NOMADSGURU_VERSION', '1.4.0' );
 define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_FILE', __FILE__ );
 
-// Require Composer Autoloader
-// Require Composer Autoloader
-if ( file_exists( NOMADSGURU_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
-	require_once NOMADSGURU_PLUGIN_DIR . 'vendor/autoload.php';
-} else {
-	// Fallback Autoloader
-	spl_autoload_register( function ( $class ) {
-		$prefix   = 'NomadsGuru\\';
-		$base_dir = NOMADSGURU_PLUGIN_DIR . 'src/';
-
-		$len = strlen( $prefix );
-		if ( strncmp( $prefix, $class, $len ) !== 0 ) {
-			return;
-		}
-
-		$relative_class = substr( $class, $len );
-		$file           = $base_dir . str_replace( '\\', '/', $relative_class ) . '.php';
-
-		if ( file_exists( $file ) ) {
-			require $file;
-		}
-	} );
+// Check PHP version
+if ( version_compare( PHP_VERSION, '7.4', '<' ) ) {
+    deactivate_plugins( plugin_basename( __FILE__ ) );
+    wp_die( sprintf(
+        /* translators: %s: Required PHP version */
+        esc_html__( 'NomadsGuru requires PHP version %s or higher. Your current version is %s.', 'nomadsguru' ),
+        '7.4',
+        PHP_VERSION
+    ) );
 }
 
-/**
- * Main Plugin Class
- */
-use NomadsGuru\Core\Loader;
+// Check WordPress version
+if ( version_compare( $GLOBALS['wp_version'], '5.8', '<' ) ) {
+    deactivate_plugins( plugin_basename( __FILE__ ) );
+    wp_die( sprintf(
+        /* translators: %s: Required WordPress version */
+        esc_html__( 'NomadsGuru requires WordPress version %s or higher.', 'nomadsguru' ),
+        '5.8'
+    ) );
+}
 
+// Simple autoloader for the new structure
+spl_autoload_register( function ( $class ) {
+    // Only handle NomadsGuru classes
+    if ( strpos( $class, 'NomadsGuru' ) !== 0 ) {
+        return;
+    }
+
+    // Convert namespace to file path
+    $class_file = str_replace( [ 'NomadsGuru\\', '\\' ], [ '', '/' ], $class );
+    $class_file = strtolower( $class_file );
+    $class_file = str_replace( '_', '-', $class_file );
+    
+    // Build the file path
+    $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/class-' . $class_file . '.php';
+    
+    // Check for deal sources
+    if ( strpos( $class_file, 'deal-sources' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/' . $class_file . '.php';
+    }
+    
+    // Check for interfaces and abstracts
+    if ( strpos( $class_file, 'interface' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/' . substr( $class_file, 10 ) . '.php';
+    } elseif ( strpos( $class_file, 'abstract' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/' . substr( $class_file, 10 ) . '.php';
+    } elseif ( strpos( $class_file, 'source' ) !== false ) {
+        $file_path = NOMADSGURU_PLUGIN_DIR . 'includes/sources/' . substr( $class_file, 6 ) . '.php';
+    }
+    
+    if ( file_exists( $file_path ) ) {
+        require_once $file_path;
+    }
+});
+
+/**
+ * Initialize the plugin
+ */
 function nomadsguru_init() {
-	$loader = Loader::get_instance();
-	$loader->init();
+    // Load core class
+    if ( class_exists( 'NomadsGuru_Core' ) ) {
+        NomadsGuru_Core::get_instance();
+    }
+    
+    // Load deal sources
+    if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
+        NomadsGuru_Deal_Sources::get_instance();
+    }
 }
 
 // Initialize the plugin
 add_action( 'plugins_loaded', 'nomadsguru_init' );
 
-// Activation Hook
-register_activation_hook( __FILE__, array( 'NomadsGuru\\Core\\Loader', 'activate' ) );
-
-// Deactivation Hook
-register_deactivation_hook( __FILE__, array( 'NomadsGuru\\Core\\Loader', 'deactivate' ) );
-
 /**
- * Handle AJAX request to save deal source
- */
-function nomadsguru_handle_save_source() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'ng_deal_sources';
-    
-    // Create table if it doesn't exist
-    $charset_collate = $wpdb->get_charset_collate();
-    $sql = "CREATE TABLE IF NOT EXISTS $table (
-        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-        source_type varchar(50) DEFAULT '',
-        source_name varchar(255) DEFAULT '',
-        website_url text,
-        rss_feed text,
-        api_endpoint text,
-        sync_interval_minutes int(11) DEFAULT 60,
-        is_active tinyint(1) DEFAULT 1,
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        KEY idx_source_type (source_type),
-        KEY idx_is_active (is_active)
-    ) $charset_collate;";
-    
-    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-    dbDelta( $sql );
-    
-    $source_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $source_type = sanitize_text_field($_POST['source_type']);
-    $source_name = sanitize_text_field($_POST['source_name']);
-    $website_url = isset($_POST['website_url']) ? esc_url_raw($_POST['website_url']) : '';
-    $rss_feed = isset($_POST['rss_feed']) ? esc_url_raw($_POST['rss_feed']) : '';
-    $api_endpoint = isset($_POST['api_endpoint']) ? esc_url_raw($_POST['api_endpoint']) : '';
-    $sync_interval = isset($_POST['sync_interval_minutes']) ? intval($_POST['sync_interval_minutes']) : 60;
-
-    // Validate required fields
-    if (empty($source_type) || empty($source_name)) {
-        wp_send_json_error(array('message' => __('Source type and name are required.', 'nomadsguru')));
-    }
-
-    if ($source_type === 'website' && empty($website_url)) {
-        wp_send_json_error(array('message' => __('Website URL is required for website sources.', 'nomadsguru')));
-    }
-
-    if ($source_type === 'rss' && empty($rss_feed)) {
-        wp_send_json_error(array('message' => __('RSS feed URL is required for RSS sources.', 'nomadsguru')));
-    }
-
-    $data = array(
-        'source_type' => $source_type,
-        'source_name' => $source_name,
-        'website_url' => $website_url,
-        'rss_feed' => $rss_feed,
-        'api_endpoint' => $api_endpoint,
-        'sync_interval_minutes' => $sync_interval,
-        'is_active' => 1,
-        'updated_at' => current_time('mysql')
-    );
-
-    if ($source_id > 0) {
-        // Update existing source
-        $result = $wpdb->update($table, $data, array('id' => $source_id));
-        if ($result !== false) {
-            wp_send_json_success(array('message' => __('Source updated successfully.', 'nomadsguru')));
-        }
-    } else {
-        // Insert new source
-        $data['created_at'] = current_time('mysql');
-        $result = $wpdb->insert($table, $data);
-        if ($result !== false) {
-            wp_send_json_success(array('message' => __('Source added successfully.', 'nomadsguru')));
-        }
-    }
-
-    wp_send_json_error(array('message' => __('Failed to save source.', 'nomadsguru')));
-}
-add_action('wp_ajax_ng_save_source', 'nomadsguru_handle_save_source');
-
-/**
- * Handle AJAX request to get deal source
- */
-function nomadsguru_handle_get_source() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'ng_deal_sources';
-    
-    // Create table if it doesn't exist
-    $charset_collate = $wpdb->get_charset_collate();
-    $sql = "CREATE TABLE IF NOT EXISTS $table (
-        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-        source_type varchar(50) DEFAULT '',
-        source_name varchar(255) DEFAULT '',
-        website_url text,
-        rss_feed text,
-        api_endpoint text,
-        sync_interval_minutes int(11) DEFAULT 60,
-        is_active tinyint(1) DEFAULT 1,
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        KEY idx_source_type (source_type),
-        KEY idx_is_active (is_active)
-    ) $charset_collate;";
-    
-    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-    dbDelta( $sql );
-    
-    $source_id = intval($_POST['source_id']);
-
-    $source = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $table WHERE id = %d",
-        $source_id
-    ));
-
-    if ($source) {
-        wp_send_json_success($source);
-    } else {
-        wp_send_json_error(array('message' => __('Source not found.', 'nomadsguru')));
-    }
-}
-add_action('wp_ajax_ng_get_source', 'nomadsguru_handle_get_source');
-
-/**
- * Handle AJAX request to delete deal source
- */
-function nomadsguru_handle_delete_source() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'ng_deal_sources';
-    
-    // Create table if it doesn't exist
-    $charset_collate = $wpdb->get_charset_collate();
-    $sql = "CREATE TABLE IF NOT EXISTS $table (
-        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-        source_type varchar(50) DEFAULT '',
-        source_name varchar(255) DEFAULT '',
-        website_url text,
-        rss_feed text,
-        api_endpoint text,
-        sync_interval_minutes int(11) DEFAULT 60,
-        is_active tinyint(1) DEFAULT 1,
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        KEY idx_source_type (source_type),
-        KEY idx_is_active (is_active)
-    ) $charset_collate;";
-    
-    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-    dbDelta( $sql );
-    
-    $source_id = intval($_POST['source_id']);
-
-    $result = $wpdb->delete($table, array('id' => $source_id));
-    
-    if ($result !== false) {
-        wp_send_json_success(array('message' => __('Source deleted successfully.', 'nomadsguru')));
-    } else {
-        wp_send_json_error(array('message' => __('Failed to delete source.', 'nomadsguru')));
-    }
-}
-add_action('wp_ajax_ng_delete_source', 'nomadsguru_handle_delete_source');
-
-/**
- * Handle AJAX request to save affiliate program
- */
-function nomadsguru_handle_save_affiliate() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_save_affiliate')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'ng_affiliate_programs';
-    
-    $affiliate_id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $program_name = sanitize_text_field($_POST['program_name']);
-    $tracking_id = sanitize_text_field($_POST['tracking_id']);
-    $commission_rate = floatval($_POST['commission_rate']);
-    $custom_params = sanitize_textarea_field($_POST['custom_params']);
-
-    // Validate required fields
-    if (empty($program_name) || empty($tracking_id)) {
-        wp_send_json_error(array('message' => __('Program name and tracking ID are required.', 'nomadsguru')));
-    }
-
-    $data = array(
-        'program_name' => $program_name,
-        'tracking_id' => $tracking_id,
-        'commission_rate' => $commission_rate,
-        'custom_params' => $custom_params,
-        'is_active' => 1,
-        'updated_at' => current_time('mysql')
-    );
-
-    if ($affiliate_id > 0) {
-        // Update existing affiliate
-        $result = $wpdb->update($table, $data, array('id' => $affiliate_id));
-        if ($result !== false) {
-            wp_send_json_success(array('message' => __('Affiliate program updated successfully.', 'nomadsguru')));
-        }
-    } else {
-        // Insert new affiliate
-        $data['created_at'] = current_time('mysql');
-        $result = $wpdb->insert($table, $data);
-        if ($result !== false) {
-            wp_send_json_success(array('message' => __('Affiliate program added successfully.', 'nomadsguru')));
-        }
-    }
-
-    wp_send_json_error(array('message' => __('Failed to save affiliate program.', 'nomadsguru')));
-}
-add_action('wp_ajax_ng_save_affiliate', 'nomadsguru_handle_save_affiliate');
-
-/**
- * Handle AJAX request to delete affiliate program
- */
-function nomadsguru_handle_delete_affiliate() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_save_affiliate')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-    $table = $wpdb->prefix . 'ng_affiliate_programs';
-    $affiliate_id = intval($_POST['id']);
-
-    $result = $wpdb->delete($table, array('id' => $affiliate_id));
-    
-    if ($result !== false) {
-        wp_send_json_success(array('message' => __('Affiliate program deleted successfully.', 'nomadsguru')));
-    } else {
-        wp_send_json_error(array('message' => __('Failed to delete affiliate program.', 'nomadsguru')));
-    }
-}
-add_action('wp_ajax_ng_delete_affiliate', 'nomadsguru_handle_delete_affiliate');
-
-/**
- * Handle AJAX request to reset plugin data
- */
-function nomadsguru_handle_reset_plugin_data() {
-    // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'nomadsguru_admin_nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
-    }
-
-    // Check user capabilities
-    if (!current_user_can('activate_plugins')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions to perform this action.', 'nomadsguru')));
-    }
-
-    global $wpdb;
-
-    // Start transaction
-    $wpdb->query('START TRANSACTION');
-
-    try {
-        // List of plugin tables to truncate
-        $tables = array(
-            $wpdb->prefix . 'ng_raw_deals',
-            $wpdb->prefix . 'ng_deal_sources',
-            $wpdb->prefix . 'ng_processing_queue',
-            $wpdb->prefix . 'ng_affiliate_programs',
-            $wpdb->prefix . 'ng_publishing_queue'
-        );
-
-        // Truncate each table if it exists
-        foreach ($tables as $table) {
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
-            if ($table_exists === $table) {
-                $wpdb->query("TRUNCATE TABLE `$table`");
-            }
-        }
-
-        // Delete all plugin options
-        $options = $wpdb->get_col(
-            $wpdb->prepare(
-                "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
-                'ng_%'
-            )
-        );
-        
-        foreach ($options as $option) {
-            delete_option($option);
-        }
-
-        // Clear all plugin caches
-        wp_cache_flush();
-        
-        // Commit transaction
-        $wpdb->query('COMMIT');
-
-        // Deactivate the plugin
-        if (is_plugin_active('nomadsguru/nomadsguru.php')) {
-            deactivate_plugins('nomadsguru/nomadsguru.php', false, is_network_admin());
-        }
-
-        wp_send_json_success(array(
-            'message' => __('Plugin data has been reset successfully. The plugin has been deactivated.', 'nomadsguru'),
-            'redirect' => admin_url('plugins.php')
-        ));
-
-    } catch (Exception $e) {
-        // Rollback on error
-        $wpdb->query('ROLLBACK');
-        wp_send_json_error(array('message' => __('Error resetting plugin data: ', 'nomadsguru') . $e->getMessage()));
-    }
-}
-add_action('wp_ajax_nomadsguru_reset_plugin_data', 'nomadsguru_handle_reset_plugin_data');
-
-/**
- * Handle AJAX request to test AI connection
+ * Handle legacy AJAX requests for backward compatibility
  */
 function nomadsguru_handle_test_ai_connection() {
     // Verify nonce
-    if (!wp_verify_nonce($_POST['nonce'], 'ng_test_ai_connection')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
+    if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+        wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
     }
 
     // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
     }
 
-    // Load AIService and test connection
-    if (class_exists('NomadsGuru\\Services\\AIService')) {
-        $ai_service = new \NomadsGuru\Services\AIService();
+    // Load AI service
+    if ( class_exists( 'NomadsGuru_AI' ) ) {
+        $ai_service = NomadsGuru_AI::get_instance();
         $result = $ai_service->test_connection();
-
-        if (is_wp_error($result)) {
-            wp_send_json_error(array('message' => $result->get_error_message()));
+        
+        if ( $result['success'] ) {
+            wp_send_json_success( array( 'message' => $result['message'] ) );
         } else {
-            wp_send_json_success(array('message' => $result['message']));
+            wp_send_json_error( array( 'message' => $result['message'] ) );
         }
     } else {
-        wp_send_json_error(array('message' => __('AI Service not available.', 'nomadsguru')));
+        wp_send_json_error( array( 'message' => __( 'AI service not available.', 'nomadsguru' ) ) );
     }
 }
-add_action('wp_ajax_ng_test_ai_connection', 'nomadsguru_handle_test_ai_connection');
+add_action( 'wp_ajax_ng_test_ai_connection', 'nomadsguru_handle_test_ai_connection' );
+
+/**
+ * Handle legacy AJAX requests for data reset
+ */
+function nomadsguru_handle_reset_plugin_data() {
+    // Verify nonce
+    if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+        wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+    }
+
+    // Check user capabilities
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+    }
+
+    global $wpdb;
+    
+    // Delete all plugin data
+    $tables = [
+        $wpdb->prefix . 'ng_deal_sources',
+        $wpdb->prefix . 'ng_affiliate_programs',
+        $wpdb->prefix . 'ng_raw_deals',
+        $wpdb->prefix . 'ng_processing_queue'
+    ];
+
+    foreach ( $tables as $table ) {
+        $wpdb->query( "DELETE FROM $table" );
+    }
+
+    // Delete options
+    $options = [
+        'ng_ai_settings',
+        'ng_publishing_settings',
+        'ng_usage_stats'
+    ];
+
+    foreach ( $options as $option ) {
+        delete_option( $option );
+    }
+
+    wp_send_json_success( array( 'message' => __( 'Plugin data has been reset successfully.', 'nomadsguru' ) ) );
+}
+add_action( 'wp_ajax_nomadsguru_reset_plugin_data', 'nomadsguru_handle_reset_plugin_data' );
+
+/**
+ * Get AI settings (legacy function for backward compatibility)
+ */
+function nomadsguru_get_ai_settings() {
+    return get_option( 'ng_ai_settings', [] );
+}
+
+/**
+ * Get publishing settings (legacy function for backward compatibility)
+ */
+function nomadsguru_get_publishing_settings() {
+    return get_option( 'ng_publishing_settings', [] );
+}
+
+/**
+ * Schedule deal sync (legacy function)
+ */
+function nomadsguru_schedule_sync() {
+    if ( ! wp_next_scheduled( 'nomadsguru_sync_deals' ) ) {
+        wp_schedule_event( time(), 'hourly', 'nomadsguru_sync_deals' );
+    }
+}
+
+/**
+ * Unschedule deal sync (legacy function)
+ */
+function nomadsguru_unschedule_sync() {
+    wp_clear_scheduled_hook( 'nomadsguru_sync_deals' );
+}
+
+/**
+ * Plugin activation hook
+ */
+register_activation_hook( __FILE__, function() {
+    // Create database tables
+    if ( class_exists( 'NomadsGuru_Core' ) ) {
+        $core = NomadsGuru_Core::get_instance();
+        $core->activate();
+    }
+    
+    // Schedule sync
+    nomadsguru_schedule_sync();
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
+} );
+
+/**
+ * Plugin deactivation hook
+ */
+register_deactivation_hook( __FILE__, function() {
+    // Unschedule sync
+    nomadsguru_unschedule_sync();
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
+} );
+
+/**
+ * Plugin uninstall hook (for future use)
+ */
+register_uninstall_hook( __FILE__, function() {
+    // Clean up all data if user wants complete removal
+    // This will be implemented when we add an uninstall option
+} );
+
+/**
+ * Get plugin info
+ */
+function nomadsguru_get_plugin_info() {
+    return [
+        'name' => 'NomadsGuru - Travel Deals AI',
+        'version' => NOMADSGURU_VERSION,
+        'author' => 'NomadsGuru Team',
+        'url' => 'https://nomadsguru.com',
+        'requires_wp' => '5.8',
+        'requires_php' => '7.4',
+        'text_domain' => 'nomadsguru'
+    ];
+}
+
+/**
+ * Check if plugin is properly configured
+ */
+function nomadsguru_is_configured() {
+    $ai_settings = get_option( 'ng_ai_settings', [] );
+    return !empty( $ai_settings['api_key'] );
+}
+
+/**
+ * Get usage statistics
+ */
+function nomadsguru_get_usage_stats() {
+    return get_option( 'ng_usage_stats', [
+        'total_requests' => 0,
+        'total_cost' => 0,
+        'last_reset' => current_time( 'mysql' )
+    ] );
+}
+
+/**
+ * Log event (simple logging for debugging)
+ */
+function nomadsguru_log( $message, $level = 'info' ) {
+    if ( WP_DEBUG && WP_DEBUG_LOG ) {
+        $log_message = sprintf(
+            '[%s] [%s] NomadsGuru: %s',
+            current_time( 'mysql' ),
+            strtoupper( $level ),
+            $message
+        );
+        error_log( $log_message );
+    }
+}
+
+// Add admin notice if not configured
+add_action( 'admin_notices', function() {
+    if ( is_admin() && current_user_can( 'manage_options' ) && ! nomadsguru_is_configured() ) {
+        ?>
+        <div class="notice notice-warning is-dismissible">
+            <p>
+                <strong><?php esc_html_e( 'NomadsGuru', 'nomadsguru' ); ?></strong> - 
+                <?php 
+                printf(
+                    /* translators: %s: Settings page URL */
+                    esc_html__( 'Please configure your AI settings in the %s to start using the plugin.', 'nomadsguru' ),
+                    '<a href="' . admin_url( 'admin.php?page=nomadsguru-settings&tab=ai' ) . '">' . esc_html__( 'Settings page', 'nomadsguru' ) . '</a>'
+                );
+                ?>
+            </p>
+        </div>
+        <?php
+    }
+} );
