@@ -23,7 +23,7 @@ class NomadsGuru_Core {
      * Plugin version
      * @var string
      */
-    private $version = '1.1.0';
+    private $version = '1.4.0';
 
     /**
      * Get singleton instance

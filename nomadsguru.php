@@ -212,12 +212,13 @@ if ( ! function_exists( 'nomadsguru_handle_reset_plugin_data' ) ) {
     ];
 
     foreach ( $tables as $table ) {
-        $wpdb->query( "DELETE FROM $table" );
+        $wpdb->query( $wpdb->prepare( "DELETE FROM %i", $table ) );
     }
 
     // Delete options
     $options = [
         'ng_ai_settings',
+        'ng_sources_settings',
         'ng_publishing_settings',
         'ng_usage_stats'
     ];

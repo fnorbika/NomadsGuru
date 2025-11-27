@@ -63,6 +63,7 @@ class NomadsGuru_Admin {
         add_action( 'wp_ajax_ng_test_ai_connection', array( $this, 'handle_test_ai_connection' ) );
         add_action( 'wp_ajax_ng_fetch_deals', array( $this, 'handle_fetch_deals' ) );
         add_action( 'wp_ajax_ng_create_sample_csv', array( $this, 'handle_create_sample_csv' ) );
+        add_action( 'wp_ajax_ng_publish_approved', array( $this, 'handle_publish_approved' ) );
         add_action( 'wp_ajax_nomadsguru_reset_plugin_data', array( $this, 'handle_reset_data' ) );
         
         // Settings registration
@@ -173,7 +174,7 @@ class NomadsGuru_Admin {
      * Register settings
      */
     public function register_settings() {
-        // AI Settings
+        // AI Settings (Clean - only AI configuration)
         register_setting(
             'nomadsguru_ai_settings',
             'ng_ai_settings',
@@ -185,13 +186,27 @@ class NomadsGuru_Admin {
                     'api_key' => '',
                     'model' => 'gpt-3.5-turbo',
                     'temperature' => 0.7,
-                    'max_tokens' => 500,
-                    'image_api_keys' => array()
+                    'max_tokens' => 500
                 )
             )
         );
 
-        // Publishing Settings
+        // Sources Settings (Deal, Image, and Inspiration sources)
+        register_setting(
+            'nomadsguru_sources',
+            'ng_sources_settings',
+            array(
+                'type' => 'object',
+                'sanitize_callback' => array( $this, 'sanitize_sources_settings' ),
+                'default' => array(
+                    'image_apis' => array(),
+                    'inspiration_sources' => array(),
+                    'deal_sources' => array()
+                )
+            )
+        );
+
+        // Enhanced Publishing Settings (Functional)
         register_setting(
             'nomadsguru_publishing',
             'ng_publishing_settings',
@@ -199,10 +214,21 @@ class NomadsGuru_Admin {
                 'type' => 'object',
                 'sanitize_callback' => array( $this, 'sanitize_publishing_settings' ),
                 'default' => array(
+                    'mode' => 'manual',
                     'auto_publish' => 0,
                     'default_category' => 0,
                     'default_author' => 1,
-                    'publish_threshold' => 7.0
+                    'publish_threshold' => 7.0,
+                    'schedule' => array(
+                        'frequency' => 'daily',
+                        'time' => '09:00',
+                        'days' => array('monday', 'wednesday', 'friday')
+                    ),
+                    'quality_control' => array(
+                        'require_manual_review' => 1,
+                        'min_deal_count' => 5,
+                        'max_age_days' => 30
+                    )
                 )
             )
         );
@@ -257,19 +283,65 @@ class NomadsGuru_Admin {
         );
 
         add_settings_field(
-            'image_api_keys',
-            __( 'Image API Keys', 'nomadsguru' ),
-            array( $this, 'render_image_api_keys_field' ),
-            'nomadsguru_ai_settings',
-            'ng_ai_section'
-        );
-
-        add_settings_field(
             'test_connection',
             __( 'Test Connection', 'nomadsguru' ),
             array( $this, 'render_test_connection_field' ),
             'nomadsguru_ai_settings',
             'ng_ai_section'
+        );
+
+        // Sources Settings Sections
+        add_settings_section(
+            'ng_image_sources_section',
+            __( 'Image Sources', 'nomadsguru' ),
+            array( $this, 'render_image_sources_section_header' ),
+            'nomadsguru_sources'
+        );
+
+        add_settings_section(
+            'ng_inspiration_sources_section',
+            __( 'Article Inspiration Sources', 'nomadsguru' ),
+            array( $this, 'render_inspiration_sources_section_header' ),
+            'nomadsguru_sources'
+        );
+
+        // Image Sources Fields
+        add_settings_field(
+            'pixabay_api_key',
+            __( 'Pixabay API Key', 'nomadsguru' ),
+            array( $this, 'render_pixabay_api_key_field' ),
+            'nomadsguru_sources',
+            'ng_image_sources_section'
+        );
+
+        add_settings_field(
+            'pexels_api_key',
+            __( 'Pexels API Key', 'nomadsguru' ),
+            array( $this, 'render_pexels_api_key_field' ),
+            'nomadsguru_sources',
+            'ng_image_sources_section'
+        );
+
+        // Publishing Settings Sections
+        add_settings_section(
+            'ng_publishing_mode_section',
+            __( 'Publishing Mode', 'nomadsguru' ),
+            array( $this, 'render_publishing_mode_section_header' ),
+            'nomadsguru_publishing'
+        );
+
+        add_settings_section(
+            'ng_content_settings_section',
+            __( 'Content Settings', 'nomadsguru' ),
+            array( $this, 'render_content_settings_section_header' ),
+            'nomadsguru_publishing'
+        );
+
+        add_settings_section(
+            'ng_quality_control_section',
+            __( 'Quality Control', 'nomadsguru' ),
+            array( $this, 'render_quality_control_section_header' ),
+            'nomadsguru_publishing'
         );
     }
 
@@ -302,7 +374,7 @@ class NomadsGuru_Admin {
                     <?php esc_html_e( 'AI Settings', 'nomadsguru' ); ?>
                 </a>
                 <a href="?page=nomadsguru-settings&tab=sources" class="nav-tab <?php echo $active_tab === 'sources' ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?>
+                    <?php esc_html_e( 'Sources', 'nomadsguru' ); ?>
                 </a>
                 <a href="?page=nomadsguru-settings&tab=publishing" class="nav-tab <?php echo $active_tab === 'publishing' ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e( 'Publishing', 'nomadsguru' ); ?>
@@ -353,22 +425,7 @@ class NomadsGuru_Admin {
     }
 
     /**
-     * Render Publishing tab
-     */
-    private function render_publishing_tab() {
-        ?>
-        <form action="options.php" method="post">
-            <?php
-            settings_fields( 'nomadsguru_publishing' );
-            do_settings_sections( 'nomadsguru_publishing' );
-            submit_button( __( 'Save Publishing Settings', 'nomadsguru' ) );
-            ?>
-        </form>
-        <?php
-    }
-
-    /**
-     * Render Deal Sources tab
+     * Render Sources tab (Modern UI/UX)
      */
     private function render_sources_tab() {
         // Get deal sources manager
@@ -377,337 +434,811 @@ class NomadsGuru_Admin {
         $statistics = $sources_manager->get_source_statistics();
         
         ?>
-        <div class="ng-sources-management">
-            <div class="ng-sources-header">
-                <h2><?php esc_html_e( 'Deal Sources Management', 'nomadsguru' ); ?></h2>
-                <p><?php esc_html_e( 'Configure and manage your deal sources. The system supports CSV files, RSS feeds, web scrapers, and API integrations.', 'nomadsguru' ); ?></p>
+        <div class="nomadsguru-sources-modern">
+            <!-- Sources Statistics Dashboard -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-number"><?php echo count( $sources ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Total Sources', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'total_deals' ) ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Total Deals', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'published_deals' ) ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Published', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'pending_deals' ) ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Pending', 'nomadsguru' ); ?></div>
+                </div>
             </div>
-            
-            <!-- Manual Fetch Section -->
-            <div class="ng-manual-fetch">
-                <h3><?php esc_html_e( 'Manual Deal Fetch', 'nomadsguru' ); ?></h3>
-                <p><?php esc_html_e( 'Manually trigger deal fetching from all active sources.', 'nomadsguru' ); ?></p>
-                
-                <button type="button" id="ng_fetch_deals" class="button button-primary">
-                    <?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>
-                </button>
-                
-                <div id="ng_fetch_results" class="ng-fetch-results"></div>
-            </div>
-            
-            <!-- Active Sources -->
-            <div class="ng-active-sources">
-                <h3><?php esc_html_e( 'Active Sources', 'nomadsguru' ); ?></h3>
-                
-                <?php if ( empty( $sources ) ): ?>
-                    <div class="ng-no-sources">
-                        <p><?php esc_html_e( 'No active deal sources configured. Add sources below to get started.', 'nomadsguru' ); ?></p>
+
+            <!-- Sources Configuration -->
+            <div class="sources-grid">
+                <!-- Deal Sources Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">📦</span> <?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure CSV files, RSS feeds, web scrapers, and API integrations for deal data.', 'nomadsguru' ); ?></p>
                     </div>
-                <?php else: ?>
-                    <table class="wp-list-table widefat fixed striped">
-                        <thead>
-                            <tr>
-                                <th><?php esc_html_e( 'Source Name', 'nomadsguru' ); ?></th>
-                                <th><?php esc_html_e( 'Type', 'nomadsguru' ); ?></th>
-                                <th><?php esc_html_e( 'Status', 'nomadsguru' ); ?></th>
-                                <th><?php esc_html_e( 'Last Fetch', 'nomadsguru' ); ?></th>
-                                <th><?php esc_html_e( 'Total Deals', 'nomadsguru' ); ?></th>
-                                <th><?php esc_html_e( 'Actions', 'nomadsguru' ); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ( $sources as $name => $source ): ?>
-                                <tr>
-                                    <td>
-                                        <strong><?php echo esc_html( $source->get_name() ); ?></strong>
-                                        <br>
-                                        <small><?php echo esc_html( $source->get_type() ); ?> source</small>
-                                    </td>
-                                    <td>
-                                        <span class="ng-source-type ng-type-<?php echo esc_attr( $source->get_type() ); ?>">
-                                            <?php echo esc_html( ucfirst( $source->get_type() ) ); ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <?php if ( $source->is_active() ): ?>
-                                            <span class="ng-status ng-status-active"><?php esc_html_e( 'Active', 'nomadsguru' ); ?></span>
-                                        <?php else: ?>
-                                            <span class="ng-status ng-status-inactive"><?php esc_html_e( 'Inactive', 'nomadsguru' ); ?></span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                        $last_fetch = $source->get_last_fetch();
-                                        if ( $last_fetch > 0 ) {
-                                            echo esc_html( human_time_diff( $last_fetch ) ) . ' ' . esc_html__( 'ago', 'nomadsguru' );
-                                        } else {
-                                            esc_html_e( 'Never', 'nomadsguru' );
-                                        }
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                        $source_stats = array_filter( $statistics, function( $stat ) use ( $name ) {
-                                            return $stat['source'] === $name;
-                                        });
-                                        if ( ! empty( $source_stats ) ) {
-                                            $stat = reset( $source_stats );
-                                            echo esc_html( $stat['total_deals'] );
-                                        } else {
-                                            echo '0';
-                                        }
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <button type="button" class="button button-small ng-test-source" data-source="<?php echo esc_attr( $name ); ?>">
-                                            <?php esc_html_e( 'Test', 'nomadsguru' ); ?>
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
-            </div>
-            
-            <!-- Source Statistics -->
-            <?php if ( ! empty( $statistics ) ): ?>
-                <div class="ng-source-statistics">
-                    <h3><?php esc_html_e( 'Source Statistics', 'nomadsguru' ); ?></h3>
-                    
-                    <div class="ng-stats-grid">
-                        <?php foreach ( $statistics as $stat ): ?>
-                            <div class="ng-stat-card">
-                                <h4><?php echo esc_html( $stat['source'] ); ?></h4>
-                                <div class="ng-stat-details">
-                                    <div class="ng-stat-item">
-                                        <span class="ng-stat-label"><?php esc_html_e( 'Total Deals:', 'nomadsguru' ); ?></span>
-                                        <span class="ng-stat-value"><?php echo esc_html( $stat['total_deals'] ); ?></span>
-                                    </div>
-                                    <div class="ng-stat-item">
-                                        <span class="ng-stat-label"><?php esc_html_e( 'Pending:', 'nomadsguru' ); ?></span>
-                                        <span class="ng-stat-value"><?php echo esc_html( $stat['pending_deals'] ); ?></span>
-                                    </div>
-                                    <div class="ng-stat-item">
-                                        <span class="ng-stat-label"><?php esc_html_e( 'Approved:', 'nomadsguru' ); ?></span>
-                                        <span class="ng-stat-value"><?php echo esc_html( $stat['approved_deals'] ); ?></span>
-                                    </div>
-                                    <div class="ng-stat-item">
-                                        <span class="ng-stat-label"><?php esc_html_e( 'Last Fetch:', 'nomadsguru' ); ?></span>
-                                        <span class="ng-stat-value">
-                                            <?php 
-                                            if ( $stat['last_fetch'] ) {
-                                                echo esc_html( human_time_diff( strtotime( $stat['last_fetch'] ) ) ) . ' ' . esc_html__( 'ago', 'nomadsguru' );
-                                            } else {
-                                                esc_html_e( 'Never', 'nomadsguru' );
-                                            }
-                                            ?>
-                                        </span>
-                                    </div>
+                    <div class="card-content">
+                        <div class="source-types">
+                            <div class="source-type">
+                                <span class="type-icon">📄</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'CSV Files', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Upload CSV files with deal data', 'nomadsguru' ); ?></p>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
+                            <div class="source-type">
+                                <span class="type-icon">📡</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Import deals from RSS feeds', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                            <div class="source-type">
+                                <span class="type-icon">🕷️</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'Web Scrapers', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Scrape deals from websites', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                            <div class="source-type">
+                                <span class="type-icon">🔌</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'API Integrations', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Connect to external APIs', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <a href="<?php echo admin_url( 'admin.php?page=nomadsguru-sources' ); ?>" class="button button-primary">
+                                <?php esc_html_e( 'Manage Deal Sources', 'nomadsguru' ); ?>
+                            </a>
+                        </div>
                     </div>
                 </div>
-            <?php endif; ?>
-            
-            <!-- CSV Source Management -->
-            <div class="ng-csv-source">
-                <h3><?php esc_html_e( 'CSV Manual Source', 'nomadsguru' ); ?></h3>
-                <p><?php esc_html_e( 'Manage your manual CSV deal source. The CSV file should contain columns: title, destination, original_price, discounted_price, currency, travel_start, travel_end, booking_url, description', 'nomadsguru' ); ?></p>
-                
-                <div class="ng-csv-actions">
-                    <button type="button" id="ng_create_sample_csv" class="button button-secondary">
-                        <?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>
-                    </button>
-                    
-                    <div class="ng-csv-info">
-                        <p><strong><?php esc_html_e( 'Current CSV File:', 'nomadsguru' ); ?></strong></p>
-                        <p><?php echo esc_html( NOMADSGURU_PLUGIN_DIR . 'data/manual-deals.csv' ); ?></p>
+
+                <!-- Image Sources Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">🖼️</span> <?php esc_html_e( 'Image Sources', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure image APIs for automatic image generation and sourcing.', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form action="options.php" method="post">
+                            <?php
+                            settings_fields( 'nomadsguru_sources' );
+                            do_settings_sections( 'nomadsguru_sources' );
+                            ?>
+                            <div class="image-apis-config">
+                                <div class="api-config-item">
+                                    <label for="pixabay_api_key">
+                                        <span class="api-icon">🎨</span>
+                                        <?php esc_html_e( 'Pixabay API', 'nomadsguru' ); ?>
+                                    </label>
+                                    <input type="password" id="pixabay_api_key" name="ng_sources_settings[pixabay_api_key]" 
+                                           value="<?php echo esc_attr( get_option( 'ng_sources_settings' )['pixabay_api_key'] ?? '' ); ?>"
+                                           placeholder="<?php esc_attr_e( 'Enter your Pixabay API key', 'nomadsguru' ); ?>">
+                                </div>
+                                <div class="api-config-item">
+                                    <label for="pexels_api_key">
+                                        <span class="api-icon">📷</span>
+                                        <?php esc_html_e( 'Pexels API', 'nomadsguru' ); ?>
+                                    </label>
+                                    <input type="password" id="pexels_api_key" name="ng_sources_settings[pexels_api_key]" 
+                                           value="<?php echo esc_attr( get_option( 'ng_sources_settings' )['pexels_api_key'] ?? '' ); ?>"
+                                           placeholder="<?php esc_attr_e( 'Enter your Pexels API key', 'nomadsguru' ); ?>">
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <button type="submit" class="button button-primary">
+                                    <?php esc_html_e( 'Save Image Settings', 'nomadsguru' ); ?>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Article Inspiration Sources Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">💡</span> <?php esc_html_e( 'Article Inspiration Sources', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure sources for content inspiration and article ideas.', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <div class="inspiration-types">
+                            <div class="inspiration-type">
+                                <span class="type-icon">📰</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'Travel Blogs', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Get inspiration from top travel blogs', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                            <div class="inspiration-type">
+                                <span class="type-icon">📊</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'News APIs', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Connect to travel news APIs', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                            <div class="inspiration-type">
+                                <span class="type-icon">📡</span>
+                                <div class="type-info">
+                                    <h4><?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Import content from RSS feeds', 'nomadsguru' ); ?></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button type="button" class="button button-secondary" id="configure-inspiration">
+                                <?php esc_html_e( 'Configure Inspiration', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Add Custom Source -->
-            <div class="ng-add-source">
-                <h3><?php esc_html_e( 'Add Custom Source', 'nomadsguru' ); ?></h3>
-                <p><?php esc_html_e( 'Add custom RSS feeds, API endpoints, or web scrapers.', 'nomadsguru' ); ?></p>
-                
-                <div class="ng-source-types">
-                    <button type="button" class="button ng-add-rss" data-type="rss">
-                        <?php esc_html_e( 'Add RSS Feed', 'nomadsguru' ); ?>
-                    </button>
-                    <button type="button" class="button ng-add-api" data-type="api">
-                        <?php esc_html_e( 'Add API Source', 'nomadsguru' ); ?>
-                    </button>
-                    <button type="button" class="button ng-add-scraper" data-type="scraper">
-                        <?php esc_html_e( 'Add Web Scraper', 'nomadsguru' ); ?>
-                    </button>
+
+            <!-- Manual Actions -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">⚡</span> <?php esc_html_e( 'Quick Actions', 'nomadsguru' ); ?></h3>
+                    <p><?php esc_html_e( 'Manual operations and system controls.', 'nomadsguru' ); ?></p>
+                </div>
+                <div class="card-content">
+                    <div class="quick-actions">
+                        <button type="button" class="button button-primary" id="fetch-all-deals">
+                            <?php esc_html_e( 'Fetch All Deals', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button button-secondary" id="test-all-sources">
+                            <?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button button-secondary" id="clear-cache">
+                            <?php esc_html_e( 'Clear Cache', 'nomadsguru' ); ?>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- Modern CSS -->
+        <style>
+        .nomadsguru-sources-modern {
+            max-width: 1200px;
+            margin: 20px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #0073aa, #005a87);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,115,170,0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,115,170,0.4);
+        }
+
+        .stat-icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .sources-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (min-width: 768px) {
+            .sources-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .settings-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .settings-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            padding: 24px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .card-header h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.3em;
+            color: #1d2327;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-icon {
+            font-size: 1.2em;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .card-content {
+            padding: 24px;
+        }
+
+        .source-types, .inspiration-types {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .source-type, .inspiration-type {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .type-icon {
+            font-size: 1.5em;
+            width: 40px;
+            text-align: center;
+        }
+
+        .type-info h4 {
+            margin: 0 0 4px 0;
+            font-size: 1.1em;
+            color: #1d2327;
+        }
+
+        .type-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .image-apis-config {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .api-config-item {
+            display: grid;
+            gap: 8px;
+        }
+
+        .api-config-item label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            color: #1d2327;
+        }
+
+        .api-icon {
+            font-size: 1.2em;
+        }
+
+        .api-config-item input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .nav-tab-wrapper {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 32px;
+        }
+
+        .nav-tab {
+            background: transparent;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px 8px 0 0;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: #666;
+        }
+
+        .nav-tab-active {
+            background: #fff;
+            border-bottom: 2px solid #0073aa;
+            color: #0073aa;
+        }
+        </style>
+        <?php
+    }
+
+    /**
+     * Render Publishing tab (Modern UI/UX - Functional)
+     */
+    private function render_publishing_tab() {
+        $settings = get_option( 'ng_publishing_settings', [] );
+        $mode = $settings['mode'] ?? 'manual';
+        $auto_publish = $settings['auto_publish'] ?? 0;
+        $default_category = $settings['default_category'] ?? 0;
+        $default_author = $settings['default_author'] ?? 1;
+        $publish_threshold = $settings['publish_threshold'] ?? 7.0;
+        $schedule = $settings['schedule'] ?? [];
+        $quality_control = $settings['quality_control'] ?? [];
+        
+        // Get publishing statistics
+        global $wpdb;
+        $total_pending = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'pending'" );
+        $total_approved = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'approved'" );
+        $total_published = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}ng_raw_deals WHERE status = 'published'" );
+        
+        ?>
+        <div class="nomadsguru-publishing-modern">
+            <!-- Publishing Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-number"><?php echo esc_html( $total_pending ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Pending', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-number"><?php echo esc_html( $total_approved ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Approved', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📤</div>
+                    <div class="stat-number"><?php echo esc_html( $total_published ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Published', 'nomadsguru' ); ?></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-number"><?php echo esc_html( $publish_threshold ); ?></div>
+                    <div class="stat-label"><?php esc_html_e( 'Score Threshold', 'nomadsguru' ); ?></div>
+                </div>
+            </div>
+
+            <!-- Publishing Mode Configuration -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">🚀</span> <?php esc_html_e( 'Publishing Mode', 'nomadsguru' ); ?></h3>
+                    <p><?php esc_html_e( 'Choose how deals are published - manual control, automatic, or hybrid approach.', 'nomadsguru' ); ?></p>
+                </div>
+                <div class="card-content">
+                    <form action="options.php" method="post">
+                        <?php settings_fields( 'nomadsguru_publishing' ); ?>
+                        
+                        <div class="publishing-modes">
+                            <label class="mode-option">
+                                <input type="radio" name="ng_publishing_settings[mode]" value="manual" 
+                                       <?php checked( $mode, 'manual' ); ?>>
+                                <div class="mode-card">
+                                    <div class="mode-icon">✋</div>
+                                    <h4><?php esc_html_e( 'Manual Publishing', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Full control - you review and approve each deal before publishing.', 'nomadsguru' ); ?></p>
+                                </div>
+                            </label>
+                            
+                            <label class="mode-option">
+                                <input type="radio" name="ng_publishing_settings[mode]" value="automatic" 
+                                       <?php checked( $mode, 'automatic' ); ?>>
+                                <div class="mode-card">
+                                    <div class="mode-icon">🤖</div>
+                                    <h4><?php esc_html_e( 'Automatic Publishing', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Hands-free - deals meeting quality criteria are published automatically.', 'nomadsguru' ); ?></p>
+                                </div>
+                            </label>
+                            
+                            <label class="mode-option">
+                                <input type="radio" name="ng_publishing_settings[mode]" value="hybrid" 
+                                       <?php checked( $mode, 'hybrid' ); ?>>
+                                <div class="mode-card">
+                                    <div class="mode-icon">⚖️</div>
+                                    <h4><?php esc_html_e( 'Hybrid Mode', 'nomadsguru' ); ?></h4>
+                                    <p><?php esc_html_e( 'Smart balance - high-quality deals auto-publish, others need approval.', 'nomadsguru' ); ?></p>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <div class="auto-publish-toggle">
+                            <label>
+                                <input type="checkbox" name="ng_publishing_settings[auto_publish]" value="1" 
+                                       <?php checked( $auto_publish, 1 ); ?>>
+                                <?php esc_html_e( 'Enable scheduled publishing', 'nomadsguru' ); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'Publish deals automatically on a schedule when in automatic or hybrid mode.', 'nomadsguru' ); ?></p>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <button type="submit" class="button button-primary">
+                                <?php esc_html_e( 'Save Publishing Mode', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Content Settings -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">📝</span> <?php esc_html_e( 'Content Settings', 'nomadsguru' ); ?></h3>
+                    <p><?php esc_html_e( 'Configure default content settings for published deals.', 'nomadsguru' ); ?></p>
+                </div>
+                <div class="card-content">
+                    <form action="options.php" method="post">
+                        <?php settings_fields( 'nomadsguru_publishing' ); ?>
+                        
+                        <div class="content-settings-grid">
+                            <div class="setting-item">
+                                <label for="default-category">
+                                    <?php esc_html_e( 'Default Category', 'nomadsguru' ); ?>
+                                </label>
+                                <?php
+                                wp_dropdown_categories( array(
+                                    'show_option_none' => __( 'Select category', 'nomadsguru' ),
+                                    'hide_empty' => 0,
+                                    'name' => 'ng_publishing_settings[default_category]',
+                                    'id' => 'default-category',
+                                    'selected' => $default_category,
+                                    'class' => 'regular-text'
+                                ) );
+                                ?>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="default-author">
+                                    <?php esc_html_e( 'Default Author', 'nomadsguru' ); ?>
+                                </label>
+                                <?php
+                                wp_dropdown_users( array(
+                                    'name' => 'ng_publishing_settings[default_author]',
+                                    'id' => 'default-author',
+                                    'selected' => $default_author,
+                                    'class' => 'regular-text'
+                                ) );
+                                ?>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="publish-threshold">
+                                    <?php esc_html_e( 'AI Score Threshold', 'nomadsguru' ); ?>
+                                </label>
+                                <input type="number" id="publish-threshold" 
+                                       name="ng_publishing_settings[publish_threshold]" 
+                                       value="<?php echo esc_attr( $publish_threshold ); ?>"
+                                       min="0" max="10" step="0.1" class="small-text">
+                                <p class="description"><?php esc_html_e( 'Minimum AI score required for automatic publishing (0-10).', 'nomadsguru' ); ?></p>
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <button type="submit" class="button button-primary">
+                                <?php esc_html_e( 'Save Content Settings', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quality Control -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">🔍</span> <?php esc_html_e( 'Quality Control', 'nomadsguru' ); ?></h3>
+                    <p><?php esc_html_e( 'Set quality criteria and review requirements.', 'nomadsguru' ); ?></p>
+                </div>
+                <div class="card-content">
+                    <form action="options.php" method="post">
+                        <?php settings_fields( 'nomadsguru_publishing' ); ?>
+                        
+                        <div class="quality-settings">
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" name="ng_publishing_settings[quality_control][require_manual_review]" value="1" 
+                                           <?php checked( $quality_control['require_manual_review'] ?? 1, 1 ); ?>>
+                                    <?php esc_html_e( 'Require manual review for all deals', 'nomadsguru' ); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e( 'Override automatic publishing and require manual approval for all deals.', 'nomadsguru' ); ?></p>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="min-deal-count">
+                                    <?php esc_html_e( 'Minimum deals per batch', 'nomadsguru' ); ?>
+                                </label>
+                                <input type="number" id="min-deal-count" 
+                                       name="ng_publishing_settings[quality_control][min_deal_count]" 
+                                       value="<?php echo esc_attr( $quality_control['min_deal_count'] ?? 5 ); ?>"
+                                       min="1" max="50" class="small-text">
+                                <p class="description"><?php esc_html_e( 'Minimum number of deals required before publishing a batch.', 'nomadsguru' ); ?></p>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label for="max-age-days">
+                                    <?php esc_html_e( 'Maximum deal age (days)', 'nomadsguru' ); ?>
+                                </label>
+                                <input type="number" id="max-age-days" 
+                                       name="ng_publishing_settings[quality_control][max_age_days]" 
+                                       value="<?php echo esc_attr( $quality_control['max_age_days'] ?? 30 ); ?>"
+                                       min="1" max="365" class="small-text">
+                                <p class="description"><?php esc_html_e( 'Don\'t publish deals older than this many days.', 'nomadsguru' ); ?></p>
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <button type="submit" class="button button-primary">
+                                <?php esc_html_e( 'Save Quality Settings', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Publishing Queue -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">📋</span> <?php esc_html_e( 'Publishing Queue', 'nomadsguru' ); ?></h3>
+                    <p><?php esc_html_e( 'Current publishing queue and recent activity.', 'nomadsguru' ); ?></p>
+                </div>
+                <div class="card-content">
+                    <div class="queue-status">
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <h4><?php esc_html_e( 'Pending Review', 'nomadsguru' ); ?></h4>
+                                <p><?php echo esc_html( $total_pending ); ?> <?php esc_html_e( 'deals waiting', 'nomadsguru' ); ?></p>
+                            </div>
+                            <button type="button" class="button button-secondary" id="review-pending">
+                                <?php esc_html_e( 'Review Now', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                        
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <h4><?php esc_html_e( 'Ready to Publish', 'nomadsguru' ); ?></h4>
+                                <p><?php echo esc_html( $total_approved ); ?> <?php esc_html_e( 'deals approved', 'nomadsguru' ); ?></p>
+                            </div>
+                            <button type="button" class="button button-primary" id="publish-approved">
+                                <?php esc_html_e( 'Publish All', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                        
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <h4><?php esc_html_e( 'Recently Published', 'nomadsguru' ); ?></h4>
+                                <p><?php echo esc_html( $total_published ); ?> <?php esc_html_e( 'deals published', 'nomadsguru' ); ?></p>
+                            </div>
+                            <button type="button" class="button button-secondary" id="view-published">
+                                <?php esc_html_e( 'View Posts', 'nomadsguru' ); ?>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modern CSS for Publishing -->
+        <style>
+        .nomadsguru-publishing-modern {
+            max-width: 1200px;
+            margin: 20px 0;
+        }
+
+        .publishing-modes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .mode-option {
+            cursor: pointer;
+        }
+
+        .mode-option input[type="radio"] {
+            display: none;
+        }
+
+        .mode-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .mode-option input[type="radio"]:checked + .mode-card {
+            background: #e7f3ff;
+            border-color: #0073aa;
+            box-shadow: 0 4px 12px rgba(0,115,170,0.2);
+        }
+
+        .mode-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+
+        .mode-icon {
+            font-size: 2em;
+            margin-bottom: 12px;
+        }
+
+        .mode-card h4 {
+            margin: 0 0 8px 0;
+            color: #1d2327;
+        }
+
+        .mode-card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .auto-publish-toggle {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .auto-publish-toggle label {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .content-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setting-item label {
+            font-weight: 500;
+            color: #1d2327;
+        }
+
+        .quality-settings {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .queue-status {
+            display: grid;
+            gap: 16px;
+        }
+
+        .queue-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .queue-info h4 {
+            margin: 0 0 4px 0;
+            color: #1d2327;
+        }
+
+        .queue-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        </style>
         
         <script>
         jQuery(document).ready(function($) {
-            // Manual fetch
-            $('#ng_fetch_deals').on('click', function() {
-                var $button = $(this);
-                var $results = $('#ng_fetch_results');
-                
-                $button.prop('disabled', true).text('<?php esc_html_e( 'Fetching...', 'nomadsguru' ); ?>');
-                $results.html('<div class="ng-loading"><?php esc_html_e( 'Fetching deals from all sources...', 'nomadsguru' ); ?></div>');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    data: {
-                        action: 'ng_fetch_deals',
-                        nonce: '<?php echo wp_create_nonce( 'nomadsguru_admin_nonce' ); ?>'
-                    },
-                    success: function(response) {
-                        $button.prop('disabled', false).text('<?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>');
-                        
-                        if (response.success) {
-                            var html = '<div class="ng-success">';
-                            html += '<h4><?php esc_html_e( 'Fetch Complete!', 'nomadsguru' ); ?></h4>';
-                            html += '<p><?php esc_html_e( 'Sources processed:', 'nomadsguru' ); ?> ' + response.data.sources_processed + '</p>';
-                            html += '<p><?php esc_html_e( 'Total deals fetched:', 'nomadsguru' ); ?> ' + response.data.total_deals + '</p>';
-                            html += '<p><?php esc_html_e( 'New deals saved:', 'nomadsguru' ); ?> ' + response.data.new_deals + '</p>';
-                            html += '</div>';
-                            $results.html(html);
-                            
-                            // Reload page after delay to show updated stats
-                            setTimeout(function() {
-                                location.reload();
-                            }, 2000);
-                        } else {
-                            $results.html('<div class="ng-error">' + response.data.message + '</div>');
-                        }
-                    },
-                    error: function() {
-                        $button.prop('disabled', false).text('<?php esc_html_e( 'Fetch Deals Now', 'nomadsguru' ); ?>');
-                        $results.html('<div class="ng-error"><?php esc_html_e( 'Request failed. Please try again.', 'nomadsguru' ); ?></div>');
-                    }
-                });
+            // Review pending deals
+            $('#review-pending').on('click', function() {
+                window.location.href = '<?php echo admin_url( "admin.php?page=nomadsguru-queue" ); ?>';
             });
             
-            // Create sample CSV
-            $('#ng_create_sample_csv').on('click', function() {
-                var $button = $(this);
-                
-                $button.prop('disabled', true).text('<?php esc_html_e( 'Creating...', 'nomadsguru' ); ?>');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    data: {
-                        action: 'ng_create_sample_csv',
-                        nonce: '<?php echo wp_create_nonce( 'nomadsguru_admin_nonce' ); ?>'
-                    },
-                    success: function(response) {
-                        $button.prop('disabled', false).text('<?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>');
-                        
-                        if (response.success) {
-                            alert('<?php esc_html_e( 'Sample CSV file created successfully!', 'nomadsguru' ); ?>');
-                        } else {
-                            alert(response.data.message || '<?php esc_html_e( 'Failed to create sample CSV.', 'nomadsguru' ); ?>');
+            // Publish approved deals
+            $('#publish-approved').on('click', function() {
+                if (confirm('<?php esc_html_e( "Publish all approved deals? This action cannot be undone.", "nomadsguru" ); ?>')) {
+                    var $button = $(this);
+                    $button.prop('disabled', true).text('<?php esc_html_e( "Publishing...", "nomadsguru" ); ?>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        data: {
+                            action: 'ng_publish_approved',
+                            nonce: '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>'
+                        },
+                        success: function(response) {
+                            $button.prop('disabled', false).text('<?php esc_html_e( "Publish All", "nomadsguru" ); ?>');
+                            
+                            if (response.success) {
+                                alert(response.data.message || '<?php esc_html_e( "Deals published successfully!", "nomadsguru" ); ?>');
+                                location.reload();
+                            } else {
+                                alert(response.data.message || '<?php esc_html_e( "Failed to publish deals.", "nomadsguru" ); ?>');
+                            }
+                        },
+                        error: function() {
+                            $button.prop('disabled', false).text('<?php esc_html_e( "Publish All", "nomadsguru" ); ?>');
+                            alert('<?php esc_html_e( "Request failed. Please try again.", "nomadsguru" ); ?>');
                         }
-                    },
-                    error: function() {
-                        $button.prop('disabled', false).text('<?php esc_html_e( 'Create Sample CSV', 'nomadsguru' ); ?>');
-                        alert('<?php esc_html_e( 'Request failed. Please try again.', 'nomadsguru' ); ?>');
-                    }
-                });
+                    });
+                }
+            });
+            
+            // View published posts
+            $('#view-published').on('click', function() {
+                window.open('<?php echo admin_url( "edit.php?post_type=post" ); ?>', '_blank');
             });
         });
         </script>
-        
-        <style>
-        .ng-sources-management {
-            max-width: 1200px;
-        }
-        .ng-sources-header {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #ddd;
-        }
-        .ng-manual-fetch, .ng-active-sources, .ng-source-statistics, .ng-csv-source, .ng-add-source {
-            margin-bottom: 40px;
-            padding: 20px;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .ng-fetch-results {
-            margin-top: 15px;
-            padding: 15px;
-            border-radius: 4px;
-        }
-        .ng-fetch-results .ng-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .ng-fetch-results .ng-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .ng-fetch-results .ng-loading {
-            background: #e2e3e5;
-            color: #383d41;
-            border: 1px solid #d6d8db;
-        }
-        .ng-source-type {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .ng-type-csv { background: #e3f2fd; color: #1976d2; }
-        .ng-type-rss { background: #f3e5f5; color: #7b1fa2; }
-        .ng-type-api { background: #e8f5e8; color: #388e3c; }
-        .ng-type-scraper { background: #fff3e0; color: #f57c00; }
-        .ng-status {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .ng-status-active { background: #d4edda; color: #155724; }
-        .ng-status-inactive { background: #f8d7da; color: #721c24; }
-        .ng-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .ng-stat-card {
-            padding: 20px;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-        }
-        .ng-stat-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-        .ng-stat-label {
-            font-weight: 500;
-        }
-        .ng-stat-value {
-            font-weight: bold;
-        }
-        .ng-csv-actions {
-            margin-top: 20px;
-        }
-        .ng-source-types {
-            margin-top: 20px;
-        }
-        .ng-source-types button {
-            margin-right: 10px;
-        }
-        </style>
         <?php
     }
 
@@ -716,6 +1247,92 @@ class NomadsGuru_Admin {
      */
     private function render_reset_tab() {
         include NOMADSGURU_PLUGIN_DIR . 'templates/admin/reset-tab.php';
+    }
+
+    /**
+     * Render Image Sources section header
+     */
+    public function render_image_sources_section_header() {
+        echo '<p>' . esc_html__( 'Configure image APIs for automatic image generation and sourcing for your travel deals.', 'nomadsguru' ) . '</p>';
+    }
+
+    /**
+     * Render Inspiration Sources section header
+     */
+    public function render_inspiration_sources_section_header() {
+        echo '<p>' . esc_html__( 'Set up sources for article inspiration and content ideas to enhance your travel deals.', 'nomadsguru' ) . '</p>';
+    }
+
+    /**
+     * Render Publishing Mode section header
+     */
+    public function render_publishing_mode_section_header() {
+        echo '<p>' . esc_html__( 'Choose how deals are published - manual control, automatic, or hybrid approach.', 'nomadsguru' ) . '</p>';
+    }
+
+    /**
+     * Render Content Settings section header
+     */
+    public function render_content_settings_section_header() {
+        echo '<p>' . esc_html__( 'Configure default content settings for published deals.', 'nomadsguru' ) . '</p>';
+    }
+
+    /**
+     * Render Quality Control section header
+     */
+    public function render_quality_control_section_header() {
+        echo '<p>' . esc_html__( 'Set quality criteria and review requirements for deal publishing.', 'nomadsguru' ) . '</p>';
+    }
+
+    /**
+     * Render Pixabay API Key field
+     */
+    public function render_pixabay_api_key_field() {
+        $settings = get_option( 'ng_sources_settings', [] );
+        $api_key = $settings['pixabay_api_key'] ?? '';
+        ?>
+        <input type="password" name="ng_sources_settings[pixabay_api_key]" 
+               value="<?php echo esc_attr( $api_key ); ?>"
+               class="regular-text"
+               placeholder="<?php esc_attr_e( 'Enter your Pixabay API key', 'nomadsguru' ); ?>">
+        <p class="description"><?php esc_html_e( 'Get your API key from https://pixabay.com/api/docs/', 'nomadsguru' ); ?></p>
+        <?php
+    }
+
+    /**
+     * Render Pexels API Key field
+     */
+    public function render_pexels_api_key_field() {
+        $settings = get_option( 'ng_sources_settings', [] );
+        $api_key = $settings['pexels_api_key'] ?? '';
+        ?>
+        <input type="password" name="ng_sources_settings[pexels_api_key]" 
+               value="<?php echo esc_attr( $api_key ); ?>"
+               class="regular-text"
+               placeholder="<?php esc_attr_e( 'Enter your Pexels API key', 'nomadsguru' ); ?>">
+        <p class="description"><?php esc_html_e( 'Get your API key from https://www.pexels.com/api/', 'nomadsguru' ); ?></p>
+        <?php
+    }
+
+    /**
+     * Sanitize Sources settings
+     */
+    public function sanitize_sources_settings( $input ) {
+        $sanitized = array();
+        
+        if ( isset( $input['pixabay_api_key'] ) ) {
+            $sanitized['pixabay_api_key'] = sanitize_text_field( $input['pixabay_api_key'] );
+        }
+        
+        if ( isset( $input['pexels_api_key'] ) ) {
+            $sanitized['pexels_api_key'] = sanitize_text_field( $input['pexels_api_key'] );
+        }
+        
+        if ( isset( $input['inspiration_sources'] ) && is_array( $input['inspiration_sources'] ) ) {
+            $sanitized['inspiration_sources'] = array_map( 'sanitize_text_field', $input['inspiration_sources'] );
+        }
+        
+        return $sanitized;
     }
 
     /**
@@ -1080,11 +1697,38 @@ class NomadsGuru_Admin {
     public function sanitize_publishing_settings( $input ) {
         $sanitized = [];
         
+        // Sanitize mode field
+        $allowed_modes = ['manual', 'automatic', 'hybrid'];
+        $sanitized['mode'] = in_array( $input['mode'] ?? 'manual', $allowed_modes ) ? $input['mode'] : 'manual';
+        
         $sanitized['auto_publish'] = isset( $input['auto_publish'] ) ? 1 : 0;
         $sanitized['default_category'] = intval( $input['default_category'] ?? 0 );
         $sanitized['default_author'] = intval( $input['default_author'] ?? 1 );
         $sanitized['publish_threshold'] = floatval( $input['publish_threshold'] ?? 7.0 );
         $sanitized['publish_threshold'] = max( 1, min( 10, $sanitized['publish_threshold'] ) );
+
+        // Sanitize schedule settings
+        $sanitized['schedule'] = [];
+        if ( isset( $input['schedule'] ) && is_array( $input['schedule'] ) ) {
+            $allowed_frequencies = ['hourly', 'daily', 'weekly', 'monthly'];
+            $sanitized['schedule']['frequency'] = in_array( $input['schedule']['frequency'] ?? 'daily', $allowed_frequencies ) 
+                ? $input['schedule']['frequency'] : 'daily';
+            
+            $sanitized['schedule']['time'] = sanitize_text_field( $input['schedule']['time'] ?? '09:00' );
+            
+            if ( isset( $input['schedule']['days'] ) && is_array( $input['schedule']['days'] ) ) {
+                $allowed_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                $sanitized['schedule']['days'] = array_intersect( $input['schedule']['days'], $allowed_days );
+            }
+        }
+
+        // Sanitize quality control settings
+        $sanitized['quality_control'] = [];
+        if ( isset( $input['quality_control'] ) && is_array( $input['quality_control'] ) ) {
+            $sanitized['quality_control']['require_manual_review'] = isset( $input['quality_control']['require_manual_review'] ) ? 1 : 0;
+            $sanitized['quality_control']['min_deal_count'] = max( 1, min( 100, intval( $input['quality_control']['min_deal_count'] ?? 5 ) ) );
+            $sanitized['quality_control']['max_age_days'] = max( 1, min( 365, intval( $input['quality_control']['max_age_days'] ?? 30 ) ) );
+        }
 
         // Add success message
         add_settings_error(
@@ -1455,12 +2099,13 @@ class NomadsGuru_Admin {
         ];
 
         foreach ( $tables as $table ) {
-            $wpdb->query( "DELETE FROM $table" );
+            $wpdb->query( $wpdb->prepare( "DELETE FROM %i", $table ) );
         }
 
         // Delete options
         $options = [
             'ng_ai_settings',
+            'ng_sources_settings',
             'ng_publishing_settings',
             'ng_usage_stats'
         ];
@@ -1498,6 +2143,91 @@ class NomadsGuru_Admin {
             'total_deals' => $results['total_deals'],
             'new_deals' => $results['total_deals'], // All fetched deals are new for now
             'details' => $results['details']
+        ) );
+    }
+
+    /**
+     * Handle publish approved deals AJAX request
+     */
+    public function handle_publish_approved() {
+        // Verify nonce
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+
+        // Check user capabilities
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+
+        global $wpdb;
+        
+        // Get approved deals
+        $table_name = $wpdb->prefix . 'ng_raw_deals';
+        $approved_deals = $wpdb->get_results( "
+            SELECT * FROM $table_name 
+            WHERE status = 'approved' 
+            AND (post_id IS NULL OR post_id = 0)
+            ORDER BY created_at DESC
+            LIMIT 50
+        " );
+
+        if ( empty( $approved_deals ) ) {
+            wp_send_json_error( array( 'message' => __( 'No approved deals found to publish.', 'nomadsguru' ) ) );
+        }
+
+        $published_count = 0;
+        $failed_count = 0;
+        $settings = get_option( 'ng_publishing_settings', [] );
+        $default_category = $settings['default_category'] ?? 0;
+        $default_author = $settings['default_author'] ?? 1;
+
+        foreach ( $approved_deals as $deal ) {
+            // Create post data
+            $post_data = array(
+                'post_title'    => wp_strip_all_tags( $deal->title ),
+                'post_content'  => $deal->description ?? '',
+                'post_status'   => 'publish',
+                'post_author'   => $default_author,
+                'post_category' => $default_category ? array( $default_category ) : array(),
+                'post_type'     => 'post'
+            );
+
+            // Insert post
+            $post_id = wp_insert_post( $post_data );
+
+            if ( $post_id && ! is_wp_error( $post_id ) ) {
+                // Add post meta for deal information
+                update_post_meta( $post_id, '_deal_source_id', $deal->source_id );
+                update_post_meta( $post_id, '_deal_destination', $deal->destination );
+                update_post_meta( $post_id, '_deal_price', $deal->price );
+                update_post_meta( $post_id, '_deal_original_price', $deal->original_price );
+                update_post_meta( $post_id, '_deal_discount', $deal->discount_percentage );
+                update_post_meta( $post_id, '_deal_url', $deal->deal_url );
+                update_post_meta( $post_id, '_deal_valid_until', $deal->valid_until );
+                update_post_meta( $post_id, '_deal_ai_score', $deal->ai_score );
+
+                // Update deal record
+                $wpdb->update(
+                    $table_name,
+                    array( 'post_id' => $post_id, 'status' => 'published' ),
+                    array( 'id' => $deal->id )
+                );
+
+                $published_count++;
+            } else {
+                $failed_count++;
+            }
+        }
+
+        wp_send_json_success( array(
+            'message' => sprintf(
+                __( 'Successfully published %d deals. %d deals failed to publish.', 'nomadsguru' ),
+                $published_count,
+                $failed_count
+            ),
+            'published_count' => $published_count,
+            'failed_count' => $failed_count
         ) );
     }
 
