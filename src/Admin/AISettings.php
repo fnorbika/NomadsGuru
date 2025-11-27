@@ -16,12 +16,12 @@ class AISettings {
     }
 
     /**
-     * Register settings and fields
+     * Register settings
      */
     public function register_settings() {
         // Register a new setting for AI configuration
         register_setting(
-            'nomadsguru_ai',
+            'nomadsguru_ai_settings', // Changed to match page slug
             self::OPTION_KEY,
             [
                 'type' => 'object',
@@ -41,7 +41,7 @@ class AISettings {
             'ng_ai_section',
             __('AI Configuration', 'nomadsguru'),
             [$this, 'render_section_header'],
-            'nomadsguru-ai-settings'
+            'nomadsguru_ai_settings' // Changed to match option group
         );
 
         // Add provider field
@@ -49,7 +49,7 @@ class AISettings {
             'ai_provider',
             __('AI Provider', 'nomadsguru'),
             [$this, 'render_provider_field'],
-            'nomadsguru-ai-settings',
+            'nomadsguru_ai_settings', // Changed to match option group
             'ng_ai_section'
         );
 
@@ -58,7 +58,7 @@ class AISettings {
             'api_key',
             __('API Key', 'nomadsguru'),
             [$this, 'render_api_key_field'],
-            'nomadsguru-ai-settings',
+            'nomadsguru_ai_settings', // Changed to match option group
             'ng_ai_section'
         );
 
@@ -67,7 +67,34 @@ class AISettings {
             'model',
             __('Model', 'nomadsguru'),
             [$this, 'render_model_field'],
-            'nomadsguru-ai-settings',
+            'nomadsguru_ai_settings', // Changed to match option group
+            'ng_ai_section'
+        );
+
+        // Add temperature field
+        add_settings_field(
+            'temperature',
+            __('Temperature', 'nomadsguru'),
+            [$this, 'render_temperature_field'],
+            'nomadsguru_ai_settings', // Changed to match option group
+            'ng_ai_section'
+        );
+
+        // Add max tokens field
+        add_settings_field(
+            'max_tokens',
+            __('Max Tokens', 'nomadsguru'),
+            [$this, 'render_max_tokens_field'],
+            'nomadsguru_ai_settings', // Changed to match option group
+            'ng_ai_section'
+        );
+
+        // Add test connection field
+        add_settings_field(
+            'test_connection',
+            __('Test Connection', 'nomadsguru'),
+            [$this, 'render_test_connection_field'],
+            'nomadsguru_ai_settings', // Changed to match option group
             'ng_ai_section'
         );
     }
@@ -83,6 +110,9 @@ class AISettings {
      * Sanitize settings before saving
      */
     public function sanitize_settings($input) {
+        // Debug: Log when sanitize is called
+        error_log('AISettings: sanitize_settings called with input: ' . print_r($input, true));
+        
         $sanitized = [];
         
         // Sanitize provider
@@ -106,6 +136,9 @@ class AISettings {
         // Sanitize max tokens
         $tokens = intval($input['max_tokens'] ?? 500);
         $sanitized['max_tokens'] = max(100, min(4000, $tokens));
+
+        // Debug: Log sanitized result
+        error_log('AISettings: sanitized result: ' . print_r($sanitized, true));
 
         return $sanitized;
     }
@@ -232,6 +265,100 @@ class AISettings {
         <p class="description">
             <?php esc_html_e('Choose the AI model to use for content generation.', 'nomadsguru'); ?>
         </p>
+        <?php
+    }
+
+    /**
+     * Render temperature field
+     */
+    public function render_temperature_field() {
+        $settings = get_option(self::OPTION_KEY, []);
+        $temperature = $settings['temperature'] ?? 0.7;
+        ?>
+        <input type="range" 
+               name="ng_ai_settings[temperature]" 
+               id="temperature" 
+               value="<?php echo esc_attr($temperature); ?>" 
+               min="0" 
+               max="2" 
+               step="0.1"
+               oninput="document.getElementById('temp_value').textContent = this.value"
+        />
+        <span id="temp_value"><?php echo esc_html($temperature); ?></span>
+        <p class="description">
+            <?php esc_html_e('Controls randomness: 0 = deterministic, 1 = creative, 2 = very creative. Recommended: 0.7', 'nomadsguru'); ?>
+        </p>
+        <?php
+    }
+
+    /**
+     * Render max tokens field
+     */
+    public function render_max_tokens_field() {
+        $settings = get_option(self::OPTION_KEY, []);
+        $max_tokens = $settings['max_tokens'] ?? 500;
+        ?>
+        <input type="number" 
+               name="ng_ai_settings[max_tokens]" 
+               id="max_tokens" 
+               value="<?php echo esc_attr($max_tokens); ?>" 
+               min="100" 
+               max="4000" 
+               step="50"
+               class="small-text"
+        />
+        <p class="description">
+            <?php esc_html_e('Maximum response length. Evaluation: 500, Content: 1000+. Recommended: 500-1500', 'nomadsguru'); ?>
+        </p>
+        <?php
+    }
+
+    /**
+     * Render test connection field
+     */
+    public function render_test_connection_field() {
+        ?>
+        <button type="button" id="test_ai_connection" class="button button-secondary">
+            <?php esc_html_e('Test API Connection', 'nomadsguru'); ?>
+        </button>
+        <span id="test_result" style="margin-left: 10px;"></span>
+        <p class="description">
+            <?php esc_html_e('Test your API connection to verify credentials and model availability.', 'nomadsguru'); ?>
+        </p>
+        
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#test_ai_connection').on('click', function() {
+                var $button = $(this);
+                var $result = $('#test_result');
+                
+                $button.prop('disabled', true);
+                $result.html('<span class="spinner is-active"></span> Testing...');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ng_test_ai_connection',
+                        nonce: '<?php echo wp_create_nonce("ng_test_ai_connection"); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $result.html('<span style="color: green;">✓ ' + response.data.message + '</span>');
+                        } else {
+                            $result.html('<span style="color: red;">✗ ' + response.data.message + '</span>');
+                        }
+                    },
+                    error: function() {
+                        $result.html('<span style="color: red;">✗ <?php esc_html_e("Test failed", "nomadsguru"); ?></span>');
+                    },
+                    complete: function() {
+                        $button.prop('disabled', false);
+                    }
+                });
+            });
+        });
+        </script>
         <?php
     }
 

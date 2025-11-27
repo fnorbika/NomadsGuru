@@ -553,6 +553,63 @@ jQuery(document).ready(function ($) {
         affiliateModal.show();
     });
 
+    // AI Settings Form Handler
+    $(document).on('submit', 'form[action="options.php"]', function(e) {
+        // Check if this is the AI settings form
+        var $aiProvider = $(this).find('#ai_provider');
+        if ($aiProvider.length > 0) {
+            console.log('AI Settings form submitted'); // Debug
+            console.log('Form data before submit:', $(this).serialize()); // Debug
+            
+            // Show loading state
+            var $submitButton = $(this).find('input[type="submit"]');
+            var originalText = $submitButton.val();
+            $submitButton.val('Saving...').prop('disabled', true);
+            
+            // Let the form submit normally to WordPress options.php
+            // The form will handle the save process and show the success message
+            setTimeout(function() {
+                $submitButton.val(originalText).prop('disabled', false);
+            }, 3000);
+        }
+    });
+    
+    // Test AI Connection Handler
+    $(document).on('click', '#test_ai_connection', function(e) {
+        e.preventDefault();
+        console.log('Test AI Connection clicked'); // Debug
+        
+        var $button = $(this);
+        var $result = $('#test_result');
+        
+        $button.prop('disabled', true);
+        $result.html('<span class="spinner is-active"></span> Testing...');
+        
+        $.ajax({
+            url: nomadsguruParams.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'ng_test_ai_connection',
+                nonce: nomadsguruParams.nonce
+            },
+            success: function(response) {
+                console.log('Test connection response:', response); // Debug
+                if (response.success) {
+                    $result.html('<span style="color: green;">✓ ' + response.data.message + '</span>');
+                } else {
+                    $result.html('<span style="color: red;">✗ ' + response.data.message + '</span>');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.log('Test connection error:', xhr.responseText); // Debug
+                $result.html('<span style="color: red;">✗ Test failed</span>');
+            },
+            complete: function() {
+                $button.prop('disabled', false);
+            }
+        });
+    });
+
     // Delete Affiliate
     $('.ng-delete-affiliate').on('click', function () {
         if (!confirm('Are you sure you want to delete this affiliate program?')) {

@@ -22,6 +22,12 @@ class AdminMenu {
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		
+		// Initialize AI settings immediately
+		$this->ai_settings->init();
+		
+		// Also register AI settings on admin_init for proper integration
+		add_action( 'admin_init', array( $this->ai_settings, 'register_settings' ), 20 );
 	}
 
 	/**
@@ -111,7 +117,7 @@ class AdminMenu {
 			'nomadsguru-admin', 
 			NOMADSGURU_PLUGIN_URL . 'assets/js/admin.js', 
 			array( 'jquery' ), 
-			NOMADSGURU_VERSION, 
+			NOMADSGURU_VERSION . '-' . time(), // Force cache bust with timestamp
 			true 
 		);
 		
@@ -366,16 +372,32 @@ class AdminMenu {
 	 * Render AI Settings Tab
 	 */
 	private function render_ai_tab() {
-		// Initialize settings if not already done
+		// Force register settings if not already done
 		if (!did_action('admin_init')) {
+			$this->ai_settings->register_settings();
+		}
+		
+		// Double-check settings are registered
+		global $wp_registered_settings;
+		if (!isset($wp_registered_settings['ng_ai_settings'])) {
 			$this->ai_settings->register_settings();
 		}
 		
 		// Show error/update messages
 		settings_errors('nomadsguru_messages');
 		
-		// Render the AI settings page
-		$this->ai_settings->render_page();
+		// Debug: Check if settings are registered
+		$settings = get_option('ng_ai_settings', []);
+		echo '<!-- Debug: Current AI Settings: ' . esc_html(print_r($settings, true)) . ' -->';
+		?>
+		<form action="options.php" method="post">
+			<?php
+			settings_fields('nomadsguru_ai_settings'); // Updated to match option group
+			do_settings_sections('nomadsguru_ai_settings'); // Updated to match option group
+			submit_button(__('Save AI Settings', 'nomadsguru'));
+			?>
+		</form>
+		<?php
 	}
 
 	/**

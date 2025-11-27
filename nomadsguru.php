@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define Plugin Constants
-define( 'NOMADSGURU_VERSION', '1.0.1' );
+define( 'NOMADSGURU_VERSION', '1.0.3' );
 define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_FILE', __FILE__ );
@@ -347,3 +347,33 @@ function nomadsguru_handle_reset_plugin_data() {
     }
 }
 add_action('wp_ajax_nomadsguru_reset_plugin_data', 'nomadsguru_handle_reset_plugin_data');
+
+/**
+ * Handle AJAX request to test AI connection
+ */
+function nomadsguru_handle_test_ai_connection() {
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'ng_test_ai_connection')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'nomadsguru')));
+    }
+
+    // Check user capabilities
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have sufficient permissions.', 'nomadsguru')));
+    }
+
+    // Load AIService and test connection
+    if (class_exists('NomadsGuru\\Services\\AIService')) {
+        $ai_service = new \NomadsGuru\Services\AIService();
+        $result = $ai_service->test_connection();
+
+        if (is_wp_error($result)) {
+            wp_send_json_error(array('message' => $result->get_error_message()));
+        } else {
+            wp_send_json_success(array('message' => $result['message']));
+        }
+    } else {
+        wp_send_json_error(array('message' => __('AI Service not available.', 'nomadsguru')));
+    }
+}
+add_action('wp_ajax_ng_test_ai_connection', 'nomadsguru_handle_test_ai_connection');
