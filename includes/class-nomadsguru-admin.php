@@ -137,46 +137,6 @@ class NomadsGuru_Admin {
             'nomadsguru-settings',
             array( $this, 'render_settings' )
         );
-
-        // Sources submenu under Settings
-        add_submenu_page(
-            'nomadsguru-settings',
-            __( 'Sources', 'nomadsguru' ),
-            __( 'Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-overview',
-            array( $this, 'render_sources_overview' )
-        );
-
-        // Deal Sources submenu under Settings
-        add_submenu_page(
-            'nomadsguru-settings',
-            __( 'Deal Sources', 'nomadsguru' ),
-            __( 'Deal Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-deal',
-            array( $this, 'render_sources_deal' )
-        );
-
-        // Image Sources submenu under Settings
-        add_submenu_page(
-            'nomadsguru-settings',
-            __( 'Image Sources', 'nomadsguru' ),
-            __( 'Image Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-image',
-            array( $this, 'render_sources_image' )
-        );
-
-        // Inspiration Sources submenu under Settings
-        add_submenu_page(
-            'nomadsguru-settings',
-            __( 'Inspiration Sources', 'nomadsguru' ),
-            __( 'Inspiration Sources', 'nomadsguru' ),
-            'manage_options',
-            'nomadsguru-sources-inspiration',
-            array( $this, 'render_sources_inspiration' )
-        );
     }
 
     /**
@@ -468,9 +428,79 @@ class NomadsGuru_Admin {
     }
 
     /**
-     * Render Sources tab (Modern UI/UX)
+     * Render Sources tab with subtabs
      */
     private function render_sources_tab() {
+        // Get the active subtab (default to overview)
+        $active_subtab = isset( $_GET['subtab'] ) ? sanitize_text_field( $_GET['subtab'] ) : 'overview';
+        
+        ?>
+        <div class="nomadsguru-sources-wrapper">
+            <!-- Subtabs Navigation -->
+            <nav class="nav-tab-wrapper sources-nav">
+                <a href="?page=nomadsguru-settings&tab=sources&subtab=overview" class="nav-tab <?php echo $active_subtab === 'overview' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Overview', 'nomadsguru' ); ?>
+                </a>
+                <a href="?page=nomadsguru-settings&tab=sources&subtab=deal-sources" class="nav-tab <?php echo $active_subtab === 'deal-sources' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?>
+                </a>
+                <a href="?page=nomadsguru-settings&tab=sources&subtab=image-sources" class="nav-tab <?php echo $active_subtab === 'image-sources' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Image Sources', 'nomadsguru' ); ?>
+                </a>
+                <a href="?page=nomadsguru-settings&tab=sources&subtab=inspiration-sources" class="nav-tab <?php echo $active_subtab === 'inspiration-sources' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Inspiration Sources', 'nomadsguru' ); ?>
+                </a>
+            </nav>
+            
+            <!-- Subtab Content -->
+            <div class="subtab-content">
+                <?php
+                switch ( $active_subtab ) {
+                    case 'overview':
+                        $this->render_sources_overview_subtab();
+                        break;
+                    case 'deal-sources':
+                        $this->render_deal_sources_subtab();
+                        break;
+                    case 'image-sources':
+                        $this->render_image_sources_subtab();
+                        break;
+                    case 'inspiration-sources':
+                        $this->render_inspiration_sources_subtab();
+                        break;
+                    default:
+                        $this->render_sources_overview_subtab();
+                        break;
+                }
+                ?>
+            </div>
+        </div>
+        
+        <style>
+        .nomadsguru-sources-wrapper {
+            margin-top: 20px;
+        }
+        
+        .sources-nav {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .subtab-content {
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+        }
+        </style>
+        <?php
+    }
+
+    /**
+     * Render Sources Overview subtab
+     */
+    private function render_sources_overview_subtab() {
         // Get deal sources manager
         $sources_manager = NomadsGuru_Deal_Sources::get_instance();
         $sources = $sources_manager->get_sources();
@@ -502,160 +532,58 @@ class NomadsGuru_Admin {
                 </div>
             </div>
 
-            <!-- Sources Configuration -->
-            <div class="sources-grid">
-                <!-- Deal Sources Card -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><span class="card-icon">📦</span> <?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?></h3>
-                        <p><?php esc_html_e( 'Configure CSV files, RSS feeds, web scrapers, and API integrations for deal data.', 'nomadsguru' ); ?></p>
-                    </div>
-                    <div class="card-content">
-                        <div class="source-types">
-                            <div class="source-type">
-                                <span class="type-icon">📄</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'CSV Files', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Upload CSV files with deal data', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                            <div class="source-type">
-                                <span class="type-icon">📡</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Import deals from RSS feeds', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                            <div class="source-type">
-                                <span class="type-icon">🕷️</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'Web Scrapers', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Scrape deals from websites', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                            <div class="source-type">
-                                <span class="type-icon">🔌</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'API Integrations', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Connect to external APIs', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-actions">
-                            <a href="<?php echo admin_url( 'admin.php?page=nomadsguru-sources' ); ?>" class="button button-primary">
-                                <?php esc_html_e( 'Manage Deal Sources', 'nomadsguru' ); ?>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Image Sources Card -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><span class="card-icon">🖼️</span> <?php esc_html_e( 'Image Sources', 'nomadsguru' ); ?></h3>
-                        <p><?php esc_html_e( 'Configure image APIs for automatic image generation and sourcing.', 'nomadsguru' ); ?></p>
-                    </div>
-                    <div class="card-content">
-                        <form action="options.php" method="post">
-                            <?php
-                            settings_fields( 'nomadsguru_sources' );
-                            do_settings_sections( 'nomadsguru_sources' );
-                            ?>
-                            <div class="image-apis-config">
-                                <div class="api-config-item">
-                                    <label for="pixabay_api_key">
-                                        <span class="api-icon">🎨</span>
-                                        <?php esc_html_e( 'Pixabay API', 'nomadsguru' ); ?>
-                                    </label>
-                                    <input type="password" id="pixabay_api_key" name="ng_sources_settings[pixabay_api_key]" 
-                                           value="<?php echo esc_attr( get_option( 'ng_sources_settings' )['pixabay_api_key'] ?? '' ); ?>"
-                                           placeholder="<?php esc_attr_e( 'Enter your Pixabay API key', 'nomadsguru' ); ?>">
-                                </div>
-                                <div class="api-config-item">
-                                    <label for="pexels_api_key">
-                                        <span class="api-icon">📷</span>
-                                        <?php esc_html_e( 'Pexels API', 'nomadsguru' ); ?>
-                                    </label>
-                                    <input type="password" id="pexels_api_key" name="ng_sources_settings[pexels_api_key]" 
-                                           value="<?php echo esc_attr( get_option( 'ng_sources_settings' )['pexels_api_key'] ?? '' ); ?>"
-                                           placeholder="<?php esc_attr_e( 'Enter your Pexels API key', 'nomadsguru' ); ?>">
-                                </div>
-                            </div>
-                            <div class="card-actions">
-                                <button type="submit" class="button button-primary">
-                                    <?php esc_html_e( 'Save Image Settings', 'nomadsguru' ); ?>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Article Inspiration Sources Card -->
-                <div class="settings-card">
-                    <div class="card-header">
-                        <h3><span class="card-icon">💡</span> <?php esc_html_e( 'Article Inspiration Sources', 'nomadsguru' ); ?></h3>
-                        <p><?php esc_html_e( 'Configure sources for content inspiration and article ideas.', 'nomadsguru' ); ?></p>
-                    </div>
-                    <div class="card-content">
-                        <div class="inspiration-types">
-                            <div class="inspiration-type">
-                                <span class="type-icon">📰</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'Travel Blogs', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Get inspiration from top travel blogs', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                            <div class="inspiration-type">
-                                <span class="type-icon">📊</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'News APIs', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Connect to travel news APIs', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                            <div class="inspiration-type">
-                                <span class="type-icon">📡</span>
-                                <div class="type-info">
-                                    <h4><?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h4>
-                                    <p><?php esc_html_e( 'Import content from RSS feeds', 'nomadsguru' ); ?></p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-actions">
-                            <button type="button" class="button button-secondary" id="configure-inspiration">
-                                <?php esc_html_e( 'Configure Inspiration', 'nomadsguru' ); ?>
-                            </button>
-                        </div>
-                    </div>
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h3><?php esc_html_e( 'Quick Actions', 'nomadsguru' ); ?></h3>
+                <div class="actions-grid">
+                    <button type="button" class="button button-primary" id="fetch-all-deals">
+                        <span class="dashicons dashicons-update-alt"></span>
+                        <?php esc_html_e( 'Fetch All Deals', 'nomadsguru' ); ?>
+                    </button>
+                    <button type="button" class="button" id="test-all-sources">
+                        <span class="dashicons dashicons-networking"></span>
+                        <?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?>
+                    </button>
+                    <button type="button" class="button" id="clear-cache">
+                        <span class="dashicons dashicons-trash"></span>
+                        <?php esc_html_e( 'Clear Cache', 'nomadsguru' ); ?>
+                    </button>
                 </div>
             </div>
 
-            <!-- Manual Actions -->
-            <div class="settings-card">
-                <div class="card-header">
-                    <h3><span class="card-icon">⚡</span> <?php esc_html_e( 'Quick Actions', 'nomadsguru' ); ?></h3>
-                    <p><?php esc_html_e( 'Manual operations and system controls.', 'nomadsguru' ); ?></p>
-                </div>
-                <div class="card-content">
-                    <div class="quick-actions">
-                        <button type="button" class="button button-primary" id="fetch-all-deals">
-                            <?php esc_html_e( 'Fetch All Deals', 'nomadsguru' ); ?>
-                        </button>
-                        <button type="button" class="button button-secondary" id="test-all-sources">
-                            <?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?>
-                        </button>
-                        <button type="button" class="button button-secondary" id="clear-cache">
-                            <?php esc_html_e( 'Clear Cache', 'nomadsguru' ); ?>
-                        </button>
-                    </div>
+            <!-- Recent Activity -->
+            <div class="recent-activity">
+                <h3><?php esc_html_e( 'Recent Activity', 'nomadsguru' ); ?></h3>
+                <div class="activity-list">
+                    <?php
+                    global $wpdb;
+                    $recent_deals = $wpdb->get_results( "
+                        SELECT r.*, s.source_name 
+                        FROM {$wpdb->prefix}ng_raw_deals r
+                        LEFT JOIN {$wpdb->prefix}ng_deal_sources s ON r.source_id = s.id
+                        ORDER BY r.created_at DESC
+                        LIMIT 5
+                    " );
+                    
+                    if ( ! empty( $recent_deals ) ) {
+                        foreach ( $recent_deals as $deal ) {
+                            echo '<div class="activity-item">';
+                            echo '<span class="activity-source">' . esc_html( $deal->source_name ?? 'Unknown' ) . '</span>';
+                            echo '<span class="activity-title">' . esc_html( $deal->title ) . '</span>';
+                            echo '<span class="activity-status status-' . esc_attr( $deal->status ) . '">' . esc_html( ucfirst( $deal->status ) ) . '</span>';
+                            echo '</div>';
+                        }
+                    } else {
+                        echo '<p>' . esc_html__( 'No recent activity found.', 'nomadsguru' ) . '</p>';
+                    }
+                    ?>
                 </div>
             </div>
         </div>
-
-        <!-- Modern CSS -->
+        
         <style>
         .nomadsguru-sources-modern {
             max-width: 1200px;
-            margin: 20px 0;
         }
 
         .stats-grid {
@@ -671,24 +599,18 @@ class NomadsGuru_Admin {
             padding: 24px;
             border-radius: 12px;
             text-align: center;
-            box-shadow: 0 4px 12px rgba(0,115,170,0.3);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,115,170,0.4);
+            box-shadow: 0 4px 12px rgba(0, 115, 170, 0.2);
         }
 
         .stat-icon {
-            font-size: 2em;
-            margin-bottom: 8px;
+            font-size: 2.5em;
+            margin-bottom: 12px;
         }
 
         .stat-number {
             font-size: 2.5em;
             font-weight: bold;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
         }
 
         .stat-label {
@@ -696,166 +618,455 @@ class NomadsGuru_Admin {
             opacity: 0.9;
         }
 
-        .sources-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 24px;
+        .quick-actions, .recent-activity {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
             margin-bottom: 24px;
         }
 
-        @media (min-width: 768px) {
-            .sources-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        .settings-card {
-            background: #fff;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .settings-card:hover {
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            transform: translateY(-2px);
-        }
-
-        .card-header {
-            padding: 24px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .card-header h3 {
-            margin: 0 0 8px 0;
-            font-size: 1.3em;
-            color: #1d2327;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .card-icon {
-            font-size: 1.2em;
-        }
-
-        .card-header p {
-            margin: 0;
-            color: #666;
-            font-size: 0.95em;
-        }
-
-        .card-content {
-            padding: 24px;
-        }
-
-        .source-types, .inspiration-types {
-            display: grid;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .source-type, .inspiration-type {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-
-        .type-icon {
-            font-size: 1.5em;
-            width: 40px;
-            text-align: center;
-        }
-
-        .type-info h4 {
-            margin: 0 0 4px 0;
-            font-size: 1.1em;
+        .quick-actions h3, .recent-activity h3 {
+            margin-top: 0;
+            margin-bottom: 16px;
             color: #1d2327;
         }
 
-        .type-info p {
-            margin: 0;
-            color: #666;
-            font-size: 0.9em;
-        }
-
-        .image-apis-config {
-            display: grid;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .api-config-item {
-            display: grid;
-            gap: 8px;
-        }
-
-        .api-config-item label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-            color: #1d2327;
-        }
-
-        .api-icon {
-            font-size: 1.2em;
-        }
-
-        .api-config-item input {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .card-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .quick-actions {
+        .actions-grid {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
         }
 
-        .nav-tab-wrapper {
+        .activity-item {
             display: flex;
-            gap: 8px;
-            border-bottom: 2px solid #e0e0e0;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-source {
+            font-weight: 500;
+            color: #0073aa;
+        }
+
+        .activity-title {
+            flex: 1;
+            margin: 0 16px;
+        }
+
+        .activity-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .status-published { background: #d4edda; color: #155724; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-approved { background: #cce5ff; color: #004085; }
+        </style>
+        <?php
+    }
+
+    /**
+     * Render Deal Sources subtab
+     */
+    private function render_deal_sources_subtab() {
+        ?>
+        <div class="nomadsguru-deal-sources-modern">
+            <h3><?php esc_html_e( 'Deal Sources Configuration', 'nomadsguru' ); ?></h3>
+            <p><?php esc_html_e( 'Configure various sources for importing deal data into your system.', 'nomadsguru' ); ?></p>
+            
+            <div class="sources-grid">
+                <!-- CSV Files Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">📄</span> <?php esc_html_e( 'CSV Files', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Upload CSV files with deal data', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="csv-upload-form" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="csv-file"><?php esc_html_e( 'Choose CSV File', 'nomadsguru' ); ?></label>
+                                <input type="file" id="csv-file" name="csv_file" accept=".csv" class="regular-text">
+                            </div>
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Upload CSV', 'nomadsguru' ); ?></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- RSS Feeds Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">📡</span> <?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure RSS feed URLs for automatic deal fetching', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="rss-feed-form">
+                            <div class="form-group">
+                                <label for="rss-url"><?php esc_html_e( 'RSS Feed URL', 'nomadsguru' ); ?></label>
+                                <input type="url" id="rss-url" name="rss_url" class="regular-text" placeholder="https://example.com/deals/feed">
+                            </div>
+                            <div class="form-group">
+                                <label for="rss-name"><?php esc_html_e( 'Feed Name', 'nomadsguru' ); ?></label>
+                                <input type="text" id="rss-name" name="rss_name" class="regular-text" placeholder="Deal Provider RSS">
+                            </div>
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Add RSS Feed', 'nomadsguru' ); ?></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- API Sources Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">🔌</span> <?php esc_html_e( 'API Sources', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure API endpoints for deal data', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="api-source-form">
+                            <div class="form-group">
+                                <label for="api-name"><?php esc_html_e( 'API Name', 'nomadsguru' ); ?></label>
+                                <input type="text" id="api-name" name="api_name" class="regular-text" placeholder="Travel API">
+                            </div>
+                            <div class="form-group">
+                                <label for="api-url"><?php esc_html_e( 'API Endpoint', 'nomadsguru' ); ?></label>
+                                <input type="url" id="api-url" name="api_url" class="regular-text" placeholder="https://api.example.com/deals">
+                            </div>
+                            <div class="form-group">
+                                <label for="api-key"><?php esc_html_e( 'API Key', 'nomadsguru' ); ?></label>
+                                <input type="password" id="api-key" name="api_key" class="regular-text" placeholder="Enter API key">
+                            </div>
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Add API Source', 'nomadsguru' ); ?></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Web Scrapers Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">🕷️</span> <?php esc_html_e( 'Web Scrapers', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'Configure web scrapers for deal websites', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="web-scraper-form">
+                            <div class="form-group">
+                                <label for="scraper-url"><?php esc_html_e( 'Website URL', 'nomadsguru' ); ?></label>
+                                <input type="url" id="scraper-url" name="scraper_url" class="regular-text" placeholder="https://example.com/deals">
+                            </div>
+                            <div class="form-group">
+                                <label for="scraper-selectors"><?php esc_html_e( 'CSS Selectors', 'nomadsguru' ); ?></label>
+                                <textarea id="scraper-selectors" name="scraper_selectors" class="large-text" rows="4" placeholder="title: .deal-title&#10;price: .deal-price&#10;url: .deal-link"></textarea>
+                            </div>
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Add Web Scraper', 'nomadsguru' ); ?></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .nomadsguru-deal-sources-modern {
+            max-width: 1200px;
+        }
+
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
             margin-bottom: 32px;
         }
 
-        .nav-tab {
-            background: transparent;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px 8px 0 0;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: #666;
+        .settings-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
-        .nav-tab-active {
-            background: #fff;
-            border-bottom: 2px solid #0073aa;
-            color: #0073aa;
+        .card-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .card-header h3 {
+            margin: 0 0 8px 0;
+            color: #1d2327;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #646970;
+            font-size: 0.9em;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #1d2327;
         }
         </style>
         <?php
     }
 
     /**
+     * Render Image Sources subtab
+     */
+    private function render_image_sources_subtab() {
+        ?>
+        <div class="nomadsguru-image-sources-modern">
+            <h3><?php esc_html_e( 'Image Sources Configuration', 'nomadsguru' ); ?></h3>
+            <p><?php esc_html_e( 'Configure free image APIs for automatic image sourcing for your deals.', 'nomadsguru' ); ?></p>
+            
+            <form action="options.php" method="post">
+                <?php
+                settings_fields( 'nomadsguru_sources' );
+                do_settings_sections( 'nomadsguru_sources' );
+                submit_button( __( 'Save Image Sources Settings', 'nomadsguru' ) );
+                ?>
+            </form>
+
+            <!-- Test Image Sources -->
+            <div class="test-sources">
+                <h3><?php esc_html_e( 'Test Image Sources', 'nomadsguru' ); ?></h3>
+                <div class="test-form">
+                    <div class="form-group">
+                        <label for="test-query"><?php esc_html_e( 'Search Query', 'nomadsguru' ); ?></label>
+                        <input type="text" id="test-query" class="regular-text" placeholder="Paris travel" value="Paris travel">
+                    </div>
+                    <button type="button" class="button button-primary" id="test-image-sources"><?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?></button>
+                </div>
+                <div id="image-test-results" class="test-results" style="display: none;">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .nomadsguru-image-sources-modern {
+            max-width: 1200px;
+        }
+
+        .test-sources {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+
+        .test-sources h3 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: #1d2327;
+        }
+
+        .test-form {
+            display: flex;
+            gap: 16px;
+            align-items: end;
+            margin-bottom: 20px;
+        }
+
+        .test-results {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 16px;
+        }
+
+        .test-success {
+            color: #155724;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #1d2327;
+        }
+        </style>
+        <?php
+    }
+
+    /**
+     * Render Inspiration Sources subtab
+     */
+    private function render_inspiration_sources_subtab() {
+        ?>
+        <div class="nomadsguru-inspiration-sources-modern">
+            <h3><?php esc_html_e( 'Inspiration Sources Configuration', 'nomadsguru' ); ?></h3>
+            <p><?php esc_html_e( 'Configure sources for content inspiration and article ideas.', 'nomadsguru' ); ?></p>
+            
+            <div class="sources-grid">
+                <!-- RSS Feeds Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">📰</span> <?php esc_html_e( 'Travel RSS Feeds', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'RSS feeds for travel inspiration and content ideas', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="inspiration-rss-form">
+                            <div class="form-group">
+                                <label for="inspiration-rss-url"><?php esc_html_e( 'RSS Feed URL', 'nomadsguru' ); ?></label>
+                                <input type="url" id="inspiration-rss-url" name="rss_url" class="regular-text" placeholder="https://example.com/travel/feed">
+                            </div>
+                            <div class="form-group">
+                                <label for="inspiration-rss-name"><?php esc_html_e( 'Feed Name', 'nomadsguru' ); ?></label>
+                                <input type="text" id="inspiration-rss-name" name="rss_name" class="regular-text" placeholder="Travel Blog RSS">
+                            </div>
+                            <div class="form-group">
+                                <label for="inspiration-rss-category"><?php esc_html_e( 'Category', 'nomadsguru' ); ?></label>
+                                <select id="inspiration-rss-category" name="rss_category">
+                                    <option value="general"><?php esc_html_e( 'General', 'nomadsguru' ); ?></option>
+                                    <option value="adventure"><?php esc_html_e( 'Adventure', 'nomadsguru' ); ?></option>
+                                    <option value="luxury"><?php esc_html_e( 'Luxury', 'nomadsguru' ); ?></option>
+                                    <option value="budget"><?php esc_html_e( 'Budget', 'nomadsguru' ); ?></option>
+                                    <option value="family"><?php esc_html_e( 'Family', 'nomadsguru' ); ?></option>
+                                </select>
+                            </div>
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Add Inspiration Feed', 'nomadsguru' ); ?></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Content Ideas Card -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <h3><span class="card-icon">💡</span> <?php esc_html_e( 'Content Ideas Generator', 'nomadsguru' ); ?></h3>
+                        <p><?php esc_html_e( 'AI-powered content ideas for travel articles', 'nomadsguru' ); ?></p>
+                    </div>
+                    <div class="card-content">
+                        <form id="content-ideas-form">
+                            <div class="form-group">
+                                <label for="destination-input"><?php esc_html_e( 'Destination', 'nomadsguru' ); ?></label>
+                                <input type="text" id="destination-input" class="regular-text" placeholder="Paris, France">
+                            </div>
+                            <div class="form-group">
+                                <label for="content-type"><?php esc_html_e( 'Content Type', 'nomadsguru' ); ?></label>
+                                <select id="content-type">
+                                    <option value="guide"><?php esc_html_e( 'Travel Guide', 'nomadsguru' ); ?></option>
+                                    <option value="deals"><?php esc_html_e( 'Deal Roundup', 'nomadsguru' ); ?></option>
+                                    <option value="tips"><?php esc_html_e( 'Travel Tips', 'nomadsguru' ); ?></option>
+                                    <option value="review"><?php esc_html_e( 'Destination Review', 'nomadsguru' ); ?></option>
+                                </select>
+                            </div>
+                            <button type="button" class="button button-primary" id="generate-ideas"><?php esc_html_e( 'Generate Ideas', 'nomadsguru' ); ?></button>
+                        </form>
+                        <div id="content-ideas-results" class="ideas-results" style="display: none;">
+                            <!-- Generated ideas will appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .nomadsguru-inspiration-sources-modern {
+            max-width: 1200px;
+        }
+
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .settings-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .card-header h3 {
+            margin: 0 0 8px 0;
+            color: #1d2327;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-header p {
+            margin: 0;
+            color: #646970;
+            font-size: 0.9em;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #1d2327;
+        }
+
+        .ideas-results {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+
+        .ideas-results h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: #1d2327;
+        }
+
+        .ideas-results ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .ideas-results li {
+            margin-bottom: 8px;
+        }
+        </style>
+        <?php
+            }
+
+        
+        
+        
+        /**
      * Render Publishing tab (Modern UI/UX - Functional)
      */
     private function render_publishing_tab() {
