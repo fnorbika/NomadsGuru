@@ -3,7 +3,7 @@
  * Plugin Name: NomadsGuru - Travel Deals AI
  * Plugin URI:  https://nomadsguru.com
  * Description: Automatically discovers, evaluates, and publishes travel deals using AI. Lightweight and robust solution for travel content automation.
- * Version:     1.1.7
+ * Version:     1.1.8
  * Author:      NomadsGuru Team
  * Author URI:  https://nomadsguru.com
  * License:     GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define Plugin Constants
-define( 'NOMADSGURU_VERSION', '1.1.7' );
+define( 'NOMADSGURU_VERSION', '1.1.8' );
 define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'NOMADSGURU_PLUGIN_FILE', __FILE__ );
