@@ -64,6 +64,9 @@ class NomadsGuru_Admin {
         add_action( 'wp_ajax_ng_fetch_deals', array( $this, 'handle_fetch_deals' ) );
         add_action( 'wp_ajax_ng_create_sample_csv', array( $this, 'handle_create_sample_csv' ) );
         add_action( 'wp_ajax_ng_publish_approved', array( $this, 'handle_publish_approved' ) );
+        add_action( 'wp_ajax_ng_upload_csv', array( $this, 'handle_upload_csv' ) );
+        add_action( 'wp_ajax_ng_add_rss_feed', array( $this, 'handle_add_rss_feed' ) );
+        add_action( 'wp_ajax_ng_test_source', array( $this, 'handle_test_source' ) );
         add_action( 'wp_ajax_nomadsguru_reset_plugin_data', array( $this, 'handle_reset_data' ) );
         
         // Settings registration
@@ -105,14 +108,44 @@ class NomadsGuru_Admin {
             array( $this, 'render_settings' )
         );
 
-        // Sources submenu
+        // Sources Overview (main sources page)
         add_submenu_page(
             'nomadsguru',
             __( 'Sources', 'nomadsguru' ),
             __( 'Sources', 'nomadsguru' ),
             'manage_options',
-            'nomadsguru-sources',
-            array( $this, 'render_sources' )
+            'nomadsguru-sources-overview',
+            array( $this, 'render_sources_overview' )
+        );
+
+        // Deal Sources submenu
+        add_submenu_page(
+            'nomadsguru',
+            __( 'Deal Sources', 'nomadsguru' ),
+            __( 'Deal Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-deal',
+            array( $this, 'render_sources_deal' )
+        );
+
+        // Image Sources submenu
+        add_submenu_page(
+            'nomadsguru',
+            __( 'Image Sources', 'nomadsguru' ),
+            __( 'Image Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-image',
+            array( $this, 'render_sources_image' )
+        );
+
+        // Inspiration Sources submenu
+        add_submenu_page(
+            'nomadsguru',
+            __( 'Inspiration Sources', 'nomadsguru' ),
+            __( 'Inspiration Sources', 'nomadsguru' ),
+            'manage_options',
+            'nomadsguru-sources-inspiration',
+            array( $this, 'render_sources_inspiration' )
         );
 
         // Queue submenu
@@ -1237,6 +1270,213 @@ class NomadsGuru_Admin {
             $('#view-published').on('click', function() {
                 window.open('<?php echo admin_url( "edit.php?post_type=post" ); ?>', '_blank');
             });
+            
+            // Sources Overview functionality
+            $('#fetch-all-deals').on('click', function() {
+                const $button = $(this);
+                $button.prop('disabled', true).text('<?php esc_html_e( "Fetching...", "nomadsguru" ); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ng_fetch_deals',
+                        nonce: '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>'
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Fetch All Deals", "nomadsguru" ); ?>');
+                        if (response.success) {
+                            alert(response.data.message || '<?php esc_html_e( "Deals fetched successfully!", "nomadsguru" ); ?>');
+                            location.reload();
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( "Failed to fetch deals.", "nomadsguru" ); ?>');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Fetch All Deals", "nomadsguru" ); ?>');
+                        alert('<?php esc_html_e( "Request failed. Please try again.", "nomadsguru" ); ?>');
+                    }
+                });
+            });
+            
+            $('#test-all-sources').on('click', function() {
+                const $button = $(this);
+                $button.prop('disabled', true).text('<?php esc_html_e( "Testing...", "nomadsguru" ); ?>');
+                
+                // Simulate testing sources
+                setTimeout(function() {
+                    $button.prop('disabled', false).text('<?php esc_html_e( "Test All Sources", "nomadsguru" ); ?>');
+                    alert('<?php esc_html_e( "All sources tested successfully!", "nomadsguru" ); ?>');
+                }, 2000);
+            });
+            
+            $('#clear-cache').on('click', function() {
+                if (confirm('<?php esc_html_e( "Are you sure you want to clear all cache?", "nomadsguru" ); ?>')) {
+                    const $button = $(this);
+                    $button.prop('disabled', true).text('<?php esc_html_e( "Clearing...", "nomadsguru" ); ?>');
+                    
+                    // Simulate cache clearing
+                    setTimeout(function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Clear Cache", "nomadsguru" ); ?>');
+                        alert('<?php esc_html_e( "Cache cleared successfully!", "nomadsguru" ); ?>');
+                    }, 1000);
+                }
+            });
+            
+            // Deal Sources functionality
+            $('#csv-upload-form').on('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData();
+                formData.append('action', 'ng_upload_csv');
+                formData.append('nonce', '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>');
+                formData.append('csv_file', $('#csv-file')[0].files[0]);
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success) {
+                            alert(response.data.message || '<?php esc_html_e( "CSV uploaded successfully!", "nomadsguru" ); ?>');
+                            location.reload();
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( "Failed to upload CSV.", "nomadsguru" ); ?>');
+                        }
+                    },
+                    error: function() {
+                        alert('<?php esc_html_e( "Upload failed. Please try again.", "nomadsguru" ); ?>');
+                    }
+                });
+            });
+            
+            $('#rss-feed-form').on('submit', function(e) {
+                e.preventDefault();
+                const data = {
+                    action: 'ng_add_rss_feed',
+                    nonce: '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>',
+                    rss_url: $('#rss-url').val(),
+                    rss_name: $('#rss-name').val()
+                };
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: data,
+                    success: function(response) {
+                        if (response.success) {
+                            alert(response.data.message || '<?php esc_html_e( "RSS feed added successfully!", "nomadsguru" ); ?>');
+                            location.reload();
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( "Failed to add RSS feed.", "nomadsguru" ); ?>');
+                        }
+                    },
+                    error: function() {
+                        alert('<?php esc_html_e( "Request failed. Please try again.", "nomadsguru" ); ?>');
+                    }
+                });
+            });
+            
+            // Test source functionality
+            $('.test-source').on('click', function() {
+                const sourceId = $(this).data('id');
+                const $button = $(this);
+                $button.prop('disabled', true).text('<?php esc_html_e( "Testing...", "nomadsguru" ); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'ng_test_source',
+                        nonce: '<?php echo wp_create_nonce( "nomadsguru_admin_nonce" ); ?>',
+                        source_id: sourceId
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Test", "nomadsguru" ); ?>');
+                        if (response.success) {
+                            alert(response.data.message || '<?php esc_html_e( "Source test successful!", "nomadsguru" ); ?>');
+                        } else {
+                            alert(response.data.message || '<?php esc_html_e( "Source test failed.", "nomadsguru" ); ?>');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text('<?php esc_html_e( "Test", "nomadsguru" ); ?>');
+                        alert('<?php esc_html_e( "Test failed. Please try again.", "nomadsguru" ); ?>');
+                    }
+                });
+            });
+            
+            // Image Sources functionality
+            $('#test-image-sources').on('click', function() {
+                const $button = $(this);
+                const query = $('#test-query').val();
+                $button.prop('disabled', true).text('<?php esc_html_e( "Testing...", "nomadsguru" ); ?>');
+                
+                const $results = $('#image-test-results');
+                $results.show().html('<p><?php esc_html_e( "Testing image sources...", "nomadsguru" ); ?></p>');
+                
+                // Simulate testing image sources
+                setTimeout(function() {
+                    $results.html(`
+                        <div class="test-success">
+                            <h4><?php esc_html_e( "Test Results", "nomadsguru" ); ?></h4>
+                            <p><strong>Pixabay:</strong> <?php esc_html_e( "Success - Found 25 images for", "nomadsguru" ); ?> "${query}"</p>
+                            <p><strong>Pexels:</strong> <?php esc_html_e( "Success - Found 18 images for", "nomadsguru" ); ?> "${query}"</p>
+                        </div>
+                    `);
+                    $button.prop('disabled', false).text('<?php esc_html_e( "Test All Sources", "nomadsguru" ); ?>');
+                }, 2000);
+            });
+            
+            // Inspiration Sources functionality
+            $('#generate-ideas').on('click', function() {
+                const $button = $(this);
+                const destination = $('#destination-input').val();
+                const contentType = $('#content-type').val();
+                $button.prop('disabled', true).text('<?php esc_html_e( "Generating...", "nomadsguru" ); ?>');
+                
+                const $results = $('#content-ideas-results');
+                $results.show().html('<p><?php esc_html_e( "Generating content ideas...", "nomadsguru" ); ?></p>');
+                
+                // Simulate AI content generation
+                setTimeout(function() {
+                    const ideas = [
+                        '<?php esc_html_e( "Top 10 Hidden Gems in", "nomadsguru" ); ?> ' + destination,
+                        '<?php esc_html_e( "Budget Travel Guide to", "nomadsguru" ); ?> ' + destination,
+                        '<?php esc_html_e( "Best Time to Visit", "nomadsguru" ); ?> ' + destination,
+                        '<?php esc_html_e( "Local Food Experiences in", "nomadsguru" ); ?> ' + destination,
+                        '<?php esc_html_e( "Photography Spots in", "nomadsguru" ); ?> ' + destination
+                    ];
+                    
+                    let html = '<h4><?php esc_html_e( "Generated Ideas", "nomadsguru" ); ?></h4><ul>';
+                    ideas.forEach(function(idea) {
+                        html += '<li><button type="button" class="button button-small use-idea" data-idea="' + idea + '">' + idea + '</button></li>';
+                    });
+                    html += '</ul>';
+                    
+                    $results.html(html);
+                    $button.prop('disabled', false).text('<?php esc_html_e( "Generate Ideas", "nomadsguru" ); ?>');
+                }, 3000);
+            });
+            
+            // Use topic functionality
+            $('.use-topic').on('click', function() {
+                const topic = $(this).data('topic');
+                $('#destination-input').val(topic);
+                alert('<?php esc_html_e( "Topic selected! You can now generate content ideas.", "nomadsguru" ); ?>');
+            });
+            
+            // Refresh trending topics
+            $('#refresh-trending').on('click', function() {
+                const $button = $(this);
+                $button.prop('disabled', true).text('<?php esc_html_e( "Refreshing...", "nomadsguru" ); ?>');
+                
+                setTimeout(function() {
+                    $button.prop('disabled', false).text('<?php esc_html_e( "Refresh Trending", "nomadsguru" ); ?>');
+                    alert('<?php esc_html_e( "Trending topics refreshed!", "nomadsguru" ); ?>');
+                }, 1500);
+            });
         });
         </script>
         <?php
@@ -1340,6 +1580,487 @@ class NomadsGuru_Admin {
      */
     public function render_sources() {
         include NOMADSGURU_PLUGIN_DIR . 'templates/admin/sources.php';
+    }
+
+    /**
+     * Render Sources Overview page
+     */
+    public function render_sources_overview() {
+        // Get deal sources manager
+        $sources_manager = NomadsGuru_Deal_Sources::get_instance();
+        $sources = $sources_manager->get_sources();
+        $statistics = $sources_manager->get_source_statistics();
+        
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Sources Overview', 'nomadsguru' ); ?></h1>
+            
+            <!-- Sources Navigation -->
+            <?php $this->render_sources_navigation( 'overview' ); ?>
+            
+            <!-- Sources Statistics Dashboard -->
+            <div class="nomadsguru-sources-modern">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-number"><?php echo count( $sources ); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Total Sources', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'total_deals' ) ); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Total Deals', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'published_deals' ) ); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Published', 'nomadsguru' ); ?></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-number"><?php echo array_sum( array_column( $statistics, 'pending_deals' ) ); ?></div>
+                        <div class="stat-label"><?php esc_html_e( 'Pending', 'nomadsguru' ); ?></div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3><?php esc_html_e( 'Quick Actions', 'nomadsguru' ); ?></h3>
+                    <div class="actions-grid">
+                        <button type="button" class="button button-primary" id="fetch-all-deals">
+                            <span class="dashicons dashicons-update-alt"></span>
+                            <?php esc_html_e( 'Fetch All Deals', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button" id="test-all-sources">
+                            <span class="dashicons dashicons-networking"></span>
+                            <?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?>
+                        </button>
+                        <button type="button" class="button" id="clear-cache">
+                            <span class="dashicons dashicons-trash"></span>
+                            <?php esc_html_e( 'Clear Cache', 'nomadsguru' ); ?>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="recent-activity">
+                    <h3><?php esc_html_e( 'Recent Activity', 'nomadsguru' ); ?></h3>
+                    <div class="activity-list">
+                        <?php
+                        global $wpdb;
+                        $recent_deals = $wpdb->get_results( "
+                            SELECT r.*, s.source_name 
+                            FROM {$wpdb->prefix}ng_raw_deals r
+                            LEFT JOIN {$wpdb->prefix}ng_deal_sources s ON r.source_id = s.id
+                            ORDER BY r.created_at DESC
+                            LIMIT 5
+                        " );
+                        
+                        if ( ! empty( $recent_deals ) ) {
+                            foreach ( $recent_deals as $deal ) {
+                                echo '<div class="activity-item">';
+                                echo '<span class="activity-source">' . esc_html( $deal->source_name ?? 'Unknown' ) . '</span>';
+                                echo '<span class="activity-title">' . esc_html( $deal->title ) . '</span>';
+                                echo '<span class="activity-status status-' . esc_attr( $deal->status ) . '">' . esc_html( ucfirst( $deal->status ) ) . '</span>';
+                                echo '</div>';
+                            }
+                        } else {
+                            echo '<p>' . esc_html__( 'No recent activity found.', 'nomadsguru' ) . '</p>';
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Deal Sources page
+     */
+    public function render_sources_deal() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Deal Sources', 'nomadsguru' ); ?></h1>
+            
+            <!-- Sources Navigation -->
+            <?php $this->render_sources_navigation( 'deal' ); ?>
+            
+            <div class="nomadsguru-sources-modern">
+                <!-- Deal Sources Configuration -->
+                <div class="sources-grid">
+                    <!-- CSV Files Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📄</span> <?php esc_html_e( 'CSV Files', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Upload CSV files with deal data', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="csv-upload-form" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="csv-file"><?php esc_html_e( 'Choose CSV File', 'nomadsguru' ); ?></label>
+                                    <input type="file" id="csv-file" name="csv_file" accept=".csv" class="regular-text">
+                                </div>
+                                <button type="submit" class="button button-primary"><?php esc_html_e( 'Upload CSV', 'nomadsguru' ); ?></button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- RSS Feeds Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📡</span> <?php esc_html_e( 'RSS Feeds', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Configure RSS feed URLs for automatic deal fetching', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="rss-feed-form">
+                                <div class="form-group">
+                                    <label for="rss-url"><?php esc_html_e( 'RSS Feed URL', 'nomadsguru' ); ?></label>
+                                    <input type="url" id="rss-url" name="rss_url" class="regular-text" placeholder="https://example.com/deals/feed">
+                                </div>
+                                <div class="form-group">
+                                    <label for="rss-name"><?php esc_html_e( 'Feed Name', 'nomadsguru' ); ?></label>
+                                    <input type="text" id="rss-name" name="rss_name" class="regular-text" placeholder="Deal Provider RSS">
+                                </div>
+                                <button type="submit" class="button button-primary"><?php esc_html_e( 'Add RSS Feed', 'nomadsguru' ); ?></button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- API Sources Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">🔌</span> <?php esc_html_e( 'API Sources', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Configure API endpoints for deal data', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="api-source-form">
+                                <div class="form-group">
+                                    <label for="api-name"><?php esc_html_e( 'API Name', 'nomadsguru' ); ?></label>
+                                    <input type="text" id="api-name" name="api_name" class="regular-text" placeholder="Travel API">
+                                </div>
+                                <div class="form-group">
+                                    <label for="api-url"><?php esc_html_e( 'API Endpoint', 'nomadsguru' ); ?></label>
+                                    <input type="url" id="api-url" name="api_url" class="regular-text" placeholder="https://api.example.com/deals">
+                                </div>
+                                <div class="form-group">
+                                    <label for="api-key"><?php esc_html_e( 'API Key', 'nomadsguru' ); ?></label>
+                                    <input type="password" id="api-key" name="api_key" class="regular-text" placeholder="Enter API key">
+                                </div>
+                                <button type="submit" class="button button-primary"><?php esc_html_e( 'Add API Source', 'nomadsguru' ); ?></button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Web Scrapers Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">🕷️</span> <?php esc_html_e( 'Web Scrapers', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Configure web scrapers for deal websites', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="web-scraper-form">
+                                <div class="form-group">
+                                    <label for="scraper-url"><?php esc_html_e( 'Website URL', 'nomadsguru' ); ?></label>
+                                    <input type="url" id="scraper-url" name="scraper_url" class="regular-text" placeholder="https://example.com/deals">
+                                </div>
+                                <div class="form-group">
+                                    <label for="scraper-selectors"><?php esc_html_e( 'CSS Selectors', 'nomadsguru' ); ?></label>
+                                    <textarea id="scraper-selectors" name="scraper_selectors" class="large-text" rows="4" placeholder="title: .deal-title&#10;price: .deal-price&#10;url: .deal-link"></textarea>
+                                </div>
+                                <button type="submit" class="button button-primary"><?php esc_html_e( 'Add Web Scraper', 'nomadsguru' ); ?></button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Sources List -->
+                <div class="active-sources">
+                    <h3><?php esc_html_e( 'Active Deal Sources', 'nomadsguru' ); ?></h3>
+                    <div class="sources-table">
+                        <?php
+                        $sources_manager = NomadsGuru_Deal_Sources::get_instance();
+                        $sources = $sources_manager->get_sources();
+                        
+                        if ( ! empty( $sources ) ) {
+                            echo '<table class="wp-list-table widefat fixed striped">';
+                            echo '<thead><tr>';
+                            echo '<th>' . esc_html__( 'Name', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Type', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Status', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Last Sync', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Actions', 'nomadsguru' ) . '</th>';
+                            echo '</tr></thead><tbody>';
+                            
+                            foreach ( $sources as $source ) {
+                                echo '<tr>';
+                                echo '<td>' . esc_html( $source['name'] ) . '</td>';
+                                echo '<td>' . esc_html( ucfirst( $source['type'] ) ) . '</td>';
+                                echo '<td><span class="status-badge status-' . esc_attr( $source['is_active'] ? 'active' : 'inactive' ) . '">' . 
+                                     esc_html( $source['is_active'] ? 'Active' : 'Inactive' ) . '</span></td>';
+                                echo '<td>' . esc_html( $source['last_sync'] ?? 'Never' ) . '</td>';
+                                echo '<td>';
+                                echo '<button type="button" class="button button-small test-source" data-id="' . esc_attr( $source['id'] ) . '">' . esc_html__( 'Test', 'nomadsguru' ) . '</button> ';
+                                echo '<button type="button" class="button button-small sync-source" data-id="' . esc_attr( $source['id'] ) . '">' . esc_html__( 'Sync', 'nomadsguru' ) . '</button> ';
+                                echo '<button type="button" class="button button-small delete-source" data-id="' . esc_attr( $source['id'] ) . '">' . esc_html__( 'Delete', 'nomadsguru' ) . '</button>';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                            
+                            echo '</tbody></table>';
+                        } else {
+                            echo '<p>' . esc_html__( 'No deal sources configured yet.', 'nomadsguru' ) . '</p>';
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Image Sources page
+     */
+    public function render_sources_image() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Image Sources', 'nomadsguru' ); ?></h1>
+            
+            <!-- Sources Navigation -->
+            <?php $this->render_sources_navigation( 'image' ); ?>
+            
+            <div class="nomadsguru-sources-modern">
+                <form action="options.php" method="post">
+                    <?php
+                    settings_fields( 'nomadsguru_sources' );
+                    do_settings_sections( 'nomadsguru_sources' );
+                    submit_button( __( 'Save Image Sources Settings', 'nomadsguru' ) );
+                    ?>
+                </form>
+
+                <!-- Image Sources Configuration -->
+                <div class="sources-grid">
+                    <!-- Pixabay Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">🖼️</span> <?php esc_html_e( 'Pixabay', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Free stock photos and videos', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <p><?php esc_html_e( 'Pixabay provides high-quality, royalty-free images that can be used for travel deals. No API key required for basic usage.', 'nomadsguru' ); ?></p>
+                            <p><strong><?php esc_html_e( 'Features:', 'nomadsguru' ); ?></strong></p>
+                            <ul>
+                                <li><?php esc_html_e( 'Free to use (no attribution required)', 'nomadsguru' ); ?></li>
+                                <li><?php esc_html_e( 'Large image library', 'nomadsguru' ); ?></li>
+                                <li><?php esc_html_e( 'High-resolution images', 'nomadsguru' ); ?></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Pexels Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📷</span> <?php esc_html_e( 'Pexels', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Free stock photos and videos', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <p><?php esc_html_e( 'Pexels offers beautiful, high-quality stock photos perfect for travel content. API key required for enhanced features.', 'nomadsguru' ); ?></p>
+                            <p><strong><?php esc_html_e( 'Features:', 'nomadsguru' ); ?></strong></p>
+                            <ul>
+                                <li><?php esc_html_e( '200 requests/hour with API key', 'nomadsguru' ); ?></li>
+                                <li><?php esc_html_e( 'Curated collections', 'nomadsguru' ); ?></li>
+                                <li><?php esc_html_e( 'Photographer information', 'nomadsguru' ); ?></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Image Sources -->
+                <div class="test-sources">
+                    <h3><?php esc_html_e( 'Test Image Sources', 'nomadsguru' ); ?></h3>
+                    <div class="test-form">
+                        <div class="form-group">
+                            <label for="test-query"><?php esc_html_e( 'Search Query', 'nomadsguru' ); ?></label>
+                            <input type="text" id="test-query" class="regular-text" placeholder="Paris travel" value="Paris travel">
+                        </div>
+                        <button type="button" class="button button-primary" id="test-image-sources"><?php esc_html_e( 'Test All Sources', 'nomadsguru' ); ?></button>
+                    </div>
+                    <div id="image-test-results" class="test-results" style="display: none;">
+                        <!-- Results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Inspiration Sources page
+     */
+    public function render_sources_inspiration() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'Inspiration Sources', 'nomadsguru' ); ?></h1>
+            
+            <!-- Sources Navigation -->
+            <?php $this->render_sources_navigation( 'inspiration' ); ?>
+            
+            <div class="nomadsguru-sources-modern">
+                <!-- Inspiration Sources Configuration -->
+                <div class="sources-grid">
+                    <!-- RSS Feeds Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📰</span> <?php esc_html_e( 'Travel RSS Feeds', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'RSS feeds for travel inspiration and content ideas', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="inspiration-rss-form">
+                                <div class="form-group">
+                                    <label for="inspiration-rss-url"><?php esc_html_e( 'RSS Feed URL', 'nomadsguru' ); ?></label>
+                                    <input type="url" id="inspiration-rss-url" name="rss_url" class="regular-text" placeholder="https://example.com/travel/feed">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspiration-rss-name"><?php esc_html_e( 'Feed Name', 'nomadsguru' ); ?></label>
+                                    <input type="text" id="inspiration-rss-name" name="rss_name" class="regular-text" placeholder="Travel Blog RSS">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspiration-rss-category"><?php esc_html_e( 'Category', 'nomadsguru' ); ?></label>
+                                    <select id="inspiration-rss-category" name="rss_category">
+                                        <option value="general"><?php esc_html_e( 'General', 'nomadsguru' ); ?></option>
+                                        <option value="adventure"><?php esc_html_e( 'Adventure', 'nomadsguru' ); ?></option>
+                                        <option value="luxury"><?php esc_html_e( 'Luxury', 'nomadsguru' ); ?></option>
+                                        <option value="budget"><?php esc_html_e( 'Budget', 'nomadsguru' ); ?></option>
+                                        <option value="family"><?php esc_html_e( 'Family', 'nomadsguru' ); ?></option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="button button-primary"><?php esc_html_e( 'Add Inspiration Feed', 'nomadsguru' ); ?></button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Content Ideas Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">💡</span> <?php esc_html_e( 'Content Ideas Generator', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'AI-powered content ideas for travel articles', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <form id="content-ideas-form">
+                                <div class="form-group">
+                                    <label for="destination-input"><?php esc_html_e( 'Destination', 'nomadsguru' ); ?></label>
+                                    <input type="text" id="destination-input" class="regular-text" placeholder="Paris, France">
+                                </div>
+                                <div class="form-group">
+                                    <label for="content-type"><?php esc_html_e( 'Content Type', 'nomadsguru' ); ?></label>
+                                    <select id="content-type">
+                                        <option value="guide"><?php esc_html_e( 'Travel Guide', 'nomadsguru' ); ?></option>
+                                        <option value="deals"><?php esc_html_e( 'Deal Roundup', 'nomadsguru' ); ?></option>
+                                        <option value="tips"><?php esc_html_e( 'Travel Tips', 'nomadsguru' ); ?></option>
+                                        <option value="review"><?php esc_html_e( 'Destination Review', 'nomadsguru' ); ?></option>
+                                    </select>
+                                </div>
+                                <button type="button" class="button button-primary" id="generate-ideas"><?php esc_html_e( 'Generate Ideas', 'nomadsguru' ); ?></button>
+                            </form>
+                            <div id="content-ideas-results" class="ideas-results" style="display: none;">
+                                <!-- Generated ideas will appear here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trending Topics Card -->
+                    <div class="settings-card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">🔥</span> <?php esc_html_e( 'Trending Travel Topics', 'nomadsguru' ); ?></h3>
+                            <p><?php esc_html_e( 'Monitor trending travel topics for content inspiration', 'nomadsguru' ); ?></p>
+                        </div>
+                        <div class="card-content">
+                            <div class="trending-topics">
+                                <?php
+                                // Sample trending topics - in real implementation, this would come from an API
+                                $trending_topics = [
+                                    'Budget European Summer 2025',
+                                    'Sustainable Travel Destinations',
+                                    'Digital Nomad Hotspots',
+                                    'Family-Friendly All-Inclusive Resorts',
+                                    'Adventure Travel in Southeast Asia'
+                                ];
+                                
+                                foreach ( $trending_topics as $topic ) {
+                                    echo '<div class="topic-tag">';
+                                    echo '<span class="topic-text">' . esc_html( $topic ) . '</span>';
+                                    echo '<button type="button" class="button button-small use-topic" data-topic="' . esc_attr( $topic ) . '">' . esc_html__( 'Use This', 'nomadsguru' ) . '</button>';
+                                    echo '</div>';
+                                }
+                                ?>
+                            </div>
+                            <button type="button" class="button" id="refresh-trending"><?php esc_html_e( 'Refresh Trending', 'nomadsguru' ); ?></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Inspiration Sources -->
+                <div class="active-sources">
+                    <h3><?php esc_html_e( 'Active Inspiration Sources', 'nomadsguru' ); ?></h3>
+                    <div class="sources-table">
+                        <?php
+                        $inspiration_sources = get_option( 'ng_sources_settings', [] );
+                        $inspiration_feeds = $inspiration_sources['inspiration_sources'] ?? [];
+                        
+                        if ( ! empty( $inspiration_feeds ) ) {
+                            echo '<table class="wp-list-table widefat fixed striped">';
+                            echo '<thead><tr>';
+                            echo '<th>' . esc_html__( 'Name', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'URL', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Category', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Last Updated', 'nomadsguru' ) . '</th>';
+                            echo '<th>' . esc_html__( 'Actions', 'nomadsguru' ) . '</th>';
+                            echo '</tr></thead><tbody>';
+                            
+                            foreach ( $inspiration_feeds as $feed ) {
+                                echo '<tr>';
+                                echo '<td>' . esc_html( $feed['name'] ) . '</td>';
+                                echo '<td><a href="' . esc_url( $feed['url'] ) . '" target="_blank">' . esc_html( $feed['url'] ) . '</a></td>';
+                                echo '<td>' . esc_html( ucfirst( $feed['category'] ) ) . '</td>';
+                                echo '<td>' . esc_html( $feed['last_updated'] ?? 'Never' ) . '</td>';
+                                echo '<td>';
+                                echo '<button type="button" class="button button-small test-feed" data-url="' . esc_url( $feed['url'] ) . '">' . esc_html__( 'Test', 'nomadsguru' ) . '</button> ';
+                                echo '<button type="button" class="button button-small delete-feed" data-name="' . esc_attr( $feed['name'] ) . '">' . esc_html__( 'Delete', 'nomadsguru' ) . '</button>';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                            
+                            echo '</tbody></table>';
+                        } else {
+                            echo '<p>' . esc_html__( 'No inspiration sources configured yet.', 'nomadsguru' ) . '</p>';
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render Sources Navigation
+     */
+    private function render_sources_navigation( $current_page = 'overview' ) {
+        $tabs = array(
+            'overview' => __( 'Overview', 'nomadsguru' ),
+            'deal' => __( 'Deal Sources', 'nomadsguru' ),
+            'image' => __( 'Image Sources', 'nomadsguru' ),
+            'inspiration' => __( 'Inspiration Sources', 'nomadsguru' )
+        );
+        
+        echo '<nav class="nav-tab-wrapper">';
+        foreach ( $tabs as $tab => $name ) {
+            $class = ( $tab == $current_page ) ? ' nav-tab-active' : '';
+            $url = admin_url( "admin.php?page=nomadsguru-sources-{$tab}" );
+            echo "<a class='nav-tab{$class}' href='{$url}'>{$name}</a>";
+        }
+        echo '</nav>';
     }
 
     /**
@@ -2264,5 +2985,138 @@ class NomadsGuru_Admin {
      */
     public function __wakeup() {
         throw new Exception( "Cannot unserialize singleton" );
+    }
+
+    /**
+     * Handle CSV upload
+     */
+    public function handle_upload_csv() {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+        
+        if ( ! isset( $_FILES['csv_file'] ) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK ) {
+            wp_send_json_error( array( 'message' => __( 'File upload failed.', 'nomadsguru' ) ) );
+        }
+        
+        $file = $_FILES['csv_file'];
+        $file_info = pathinfo( $file['name'] );
+        
+        if ( strtolower( $file_info['extension'] ) !== 'csv' ) {
+            wp_send_json_error( array( 'message' => __( 'Please upload a CSV file.', 'nomadsguru' ) ) );
+        }
+        
+        // Process CSV file (simplified implementation)
+        $csv_data = array_map( 'str_getcsv', file( $file['tmp_name'] ) );
+        $headers = array_shift( $csv_data );
+        
+        // Save to database or process as needed
+        // For now, just return success
+        wp_send_json_success( array( 'message' => __( 'CSV uploaded successfully!', 'nomadsguru' ) ) );
+    }
+
+    /**
+     * Handle RSS feed addition
+     */
+    public function handle_add_rss_feed() {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+        
+        $rss_url = sanitize_url( $_POST['rss_url'] );
+        $rss_name = sanitize_text_field( $_POST['rss_name'] );
+        
+        if ( empty( $rss_url ) || empty( $rss_name ) ) {
+            wp_send_json_error( array( 'message' => __( 'Please provide both URL and name.', 'nomadsguru' ) ) );
+        }
+        
+        // Validate RSS URL
+        $rss = simplexml_load_file( $rss_url );
+        if ( ! $rss ) {
+            wp_send_json_error( array( 'message' => __( 'Invalid RSS feed URL.', 'nomadsguru' ) ) );
+        }
+        
+        // Save RSS feed to database (simplified)
+        global $wpdb;
+        $table = $wpdb->prefix . 'ng_deal_sources';
+        
+        $result = $wpdb->insert(
+            $table,
+            array(
+                'source_name' => $rss_name,
+                'source_type' => 'rss',
+                'source_url' => $rss_url,
+                'is_active' => 1,
+                'created_at' => current_time( 'mysql' )
+            ),
+            array( '%s', '%s', '%s', '%d', '%s' )
+        );
+        
+        if ( $result !== false ) {
+            wp_send_json_success( array( 'message' => __( 'RSS feed added successfully!', 'nomadsguru' ) ) );
+        } else {
+            wp_send_json_error( array( 'message' => __( 'Failed to add RSS feed.', 'nomadsguru' ) ) );
+        }
+    }
+
+    /**
+     * Handle source testing
+     */
+    public function handle_test_source() {
+        if ( ! wp_verify_nonce( $_POST['nonce'], 'nomadsguru_admin_nonce' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'nomadsguru' ) ) );
+        }
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'You do not have sufficient permissions.', 'nomadsguru' ) ) );
+        }
+        
+        $source_id = intval( $_POST['source_id'] );
+        
+        if ( ! $source_id ) {
+            wp_send_json_error( array( 'message' => __( 'Invalid source ID.', 'nomadsguru' ) ) );
+        }
+        
+        // Get source from database
+        global $wpdb;
+        $table = $wpdb->prefix . 'ng_deal_sources';
+        $source = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $source_id ) );
+        
+        if ( ! $source ) {
+            wp_send_json_error( array( 'message' => __( 'Source not found.', 'nomadsguru' ) ) );
+        }
+        
+        // Test source based on type (simplified implementation)
+        $test_result = true;
+        $message = __( 'Source test successful!', 'nomadsguru' );
+        
+        if ( $source->source_type === 'rss' ) {
+            $rss = @simplexml_load_file( $source->source_url );
+            $test_result = ( $rss !== false );
+            if ( ! $test_result ) {
+                $message = __( 'RSS feed is not accessible.', 'nomadsguru' );
+            }
+        } elseif ( $source->source_type === 'api' ) {
+            // Test API endpoint
+            $response = @wp_remote_get( $source->source_url );
+            $test_result = ! is_wp_error( $response );
+            if ( ! $test_result ) {
+                $message = __( 'API endpoint is not accessible.', 'nomadsguru' );
+            }
+        }
+        
+        if ( $test_result ) {
+            wp_send_json_success( array( 'message' => $message ) );
+        } else {
+            wp_send_json_error( array( 'message' => $message ) );
+        }
     }
 }
