@@ -117,10 +117,30 @@ if ( ! function_exists( 'nomadsguru_init' ) ) {
             }
         }
         
+        // Load deal source classes (interfaces and abstracts first)
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/interfaces/DealSourceInterface.php';
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/abstracts/AbstractDealSource.php';
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/sources/CsvDealSource.php';
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/sources/RssDealSource.php';
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/sources/WebScraperSource.php';
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/sources/ApiDealSource.php';
+        
         // Manually load deal sources class
         require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-deal-sources.php';
         if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
             NomadsGuru_Deal_Sources::get_instance();
+        }
+        
+        // Load REST API class
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-rest.php';
+        if ( class_exists( 'NomadsGuru_REST' ) ) {
+            NomadsGuru_REST::get_instance();
+        }
+        
+        // Load shortcodes class
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-shortcodes.php';
+        if ( class_exists( 'NomadsGuru_Shortcodes' ) ) {
+            NomadsGuru_Shortcodes::get_instance();
         }
         
         // Load AI class if needed
