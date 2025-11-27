@@ -103,14 +103,30 @@ spl_autoload_register( function ( $class ) {
  */
 if ( ! function_exists( 'nomadsguru_init' ) ) {
     function nomadsguru_init() {
-        // Load core class
+        // Manually load core class to ensure admin menu works
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-core.php';
         if ( class_exists( 'NomadsGuru_Core' ) ) {
             NomadsGuru_Core::get_instance();
         }
         
-        // Load deal sources
+        // Manually load admin class to ensure menu is available
+        if ( is_admin() ) {
+            require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-admin.php';
+            if ( class_exists( 'NomadsGuru_Admin' ) ) {
+                NomadsGuru_Admin::get_instance();
+            }
+        }
+        
+        // Manually load deal sources class
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-deal-sources.php';
         if ( class_exists( 'NomadsGuru_Deal_Sources' ) ) {
             NomadsGuru_Deal_Sources::get_instance();
+        }
+        
+        // Load AI class if needed
+        require_once NOMADSGURU_PLUGIN_DIR . 'includes/class-nomadsguru-ai.php';
+        if ( class_exists( 'NomadsGuru_AI' ) ) {
+            NomadsGuru_AI::get_instance();
         }
     }
 }

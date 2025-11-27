@@ -49,10 +49,19 @@ class NomadsGuru_Core {
      * Define plugin constants
      */
     private function define_constants() {
-        define( 'NOMADSGURU_VERSION', $this->version );
-        define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( dirname( __FILE__ ) ) );
-        define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( dirname( __FILE__ ) ) );
-        define( 'NOMADSGURU_PLUGIN_FILE', dirname( __FILE__ ) . '/nomadsguru.php' );
+        // Only define constants if they don't already exist
+        if ( ! defined( 'NOMADSGURU_VERSION' ) ) {
+            define( 'NOMADSGURU_VERSION', $this->version );
+        }
+        if ( ! defined( 'NOMADSGURU_PLUGIN_DIR' ) ) {
+            define( 'NOMADSGURU_PLUGIN_DIR', plugin_dir_path( dirname( __FILE__ ) ) );
+        }
+        if ( ! defined( 'NOMADSGURU_PLUGIN_URL' ) ) {
+            define( 'NOMADSGURU_PLUGIN_URL', plugin_dir_url( dirname( __FILE__ ) ) );
+        }
+        if ( ! defined( 'NOMADSGURU_PLUGIN_FILE' ) ) {
+            define( 'NOMADSGURU_PLUGIN_FILE', dirname( __FILE__ ) . '/nomadsguru.php' );
+        }
     }
 
     /**
